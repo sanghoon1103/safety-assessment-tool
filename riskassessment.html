@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>위험성 평가 프로그램</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* 한글 폰트 설정 */
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap');
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      background-color: #f3f4f6;
+    }
+    .main-container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 100;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0, 0, 0, 0.4);
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-content {
+      background-color: #fefefe;
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      width: 90%;
+      max-width: 800px;
+      animation: fadeIn 0.3s;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.9); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    .modal-content-scroll {
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+    .modal-content-scroll::-webkit-scrollbar { width: 8px; }
+    .modal-content-scroll::-webkit-scrollbar-thumb { background-color: #fca5a5; border-radius: 4px; }
+    .modal-content-scroll::-webkit-scrollbar-track { background-color: #fee2e2; }
+    .case-item { cursor: pointer; transition: all 0.2s; }
+    .case-item:hover { background-color: #fef2f2; }
+    .case-item.selected { background-color: #fca5a5; color: #7f1d1d; font-weight: bold; }
+    .chart-container { display: flex; justify-content: center; align-items: flex-end; gap: 2rem; height: 150px; padding: 1rem; border: 1px solid #fee2e2; border-radius: 0.5rem; background-color: #fff; }
+    .bar-wrapper { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+    .bar { width: 60px; border-radius: 4px 4px 0 0; transition: height 0.5s ease-out; display: flex; justify-content: center; align-items: center; color: white; font-weight: bold; font-size: 1.1rem; }
+    .pre-bar { background-color: #ef4444; }
+    .post-bar { background-color: #3b82f6; }
+    .bar-label { font-weight: bold; }
+  </style>
+</head>
+<body class="p-8">
+
+    <div id="app" class="main-container bg-white p-8 rounded-2xl shadow-xl">
+        </div>
+
+    <div id="assessment-modal" class="modal">
+        <div class="modal-content"></div>
+    </div>
+
+    <script>
+    // --- 1. 데이터 영역 ---
+    const assessmentData = [
+      { task: '방제', subTask: '농약 준비·혼합', risks: [ { id: 'pesticide_mix_1', description: "ⓐ 행동: 계량·혼합 순서 오류, 급한 작업으로 인한 비산\nⓔ 환경: 환기 불량, 밀폐공간 고온다습\nⓢ 물질 :  고농도·휘발성 농약, 독성 증기 발생, 피부 접촉 가능성\nⓜ 장비 :  펌프·호스 연결부 누수, 혼합기 안전장치 불량", case: "사례1: 밀폐 창고에서 계량 부주의로 고농도 농약이 누출, 펌프 연결부 누수로 흡입·피부 노출", preSeverity: 4, preFrequency: 4, weight: 3 }, { id: 'pesticide_mix_2', description: "ⓐ 행동: 계량·혼합 순서 오류, 급한 작업으로 인한 비산\nⓔ 환경: 환기 불량, 밀폐공간 고온다습\nⓢ 물질 :  고농도·휘발성 농약, 독성 증기 발생, 피부 접촉 가능성\nⓜ 장비 :  펌프·호스 연결부 누수, 혼합기 안전장치 불량", case: "사례2: 혼합 순서 오류 → 농약 증기 급증, 호스 누출", preSeverity: 4, preFrequency: 3, weight: 2 }, { id: 'pesticide_mix_3', description: "ⓐ 행동: 계량·혼합 순서 오류, 급한 작업으로 인한 비산\nⓔ 환경: 환기 불량, 밀폐공간 고온다습\nⓢ 물질 :  고농도·휘발성 농약, 독성 증기 발생, 피부 접촉 가능성\nⓜ 장비 :  펌프·호스 연결부 누수, 혼합기 안전장치 불량", case: "사례3: 노즐 시험 중 역분사로 얼굴에 농약 튐, 환기 부족", preSeverity: 4, preFrequency: 3, weight: 2 }, { id: 'pesticide_mix_4', description: "ⓐ 행동: 계량·혼합 순서 오류, 급한 작업으로 인한 비산\nⓔ 환경: 환기 불량, 밀폐공간 고온다습\nⓢ 물질 :  고농도·휘발성 농약, 독성 증기 발생, 피부 접촉 가능성\nⓜ 장비 :  펌프·호스 연결부 누수, 혼합기 안전장치 불량", case: "사례4: 외부 희석 중 바람에 비산, 인근 작업자 노출", preSeverity: 3, preFrequency: 3, weight: 2 } ] },
+      { task: '방제', subTask: '살포', risks: [ { id: 'pesticide_spray_1', description: "ⓐ 행동: 바람·방향 고려 미흡, 작업자 하향살포\nⓔ 환경: 고온·강풍, 비 예보\nⓢ 물질 :  고독성 농약, 미세비산\nⓜ 장비 :  노즐 막힘·역분사, 압력불안정", case: "사례1: 강풍 시 살포, 바람에 농약 비산하여 주변인 노출", preSeverity: 3, preFrequency: 4, weight: 3 }, { id: 'pesticide_spray_2', description: "ⓐ 행동: 바람·방향 고려 미흡, 작업자 하향살포\nⓔ 환경: 고온·강풍, 비 예보\nⓢ 물질 :  고독성 농약, 미세비산\nⓜ 장비 :  노즐 막힘·역분사, 압력불안정", case: "사례2: 노즐 역분사로 안면 노출, 고압 누출", preSeverity: 4, preFrequency: 3, weight: 2 }, { id: 'pesticide_spray_3', description: "ⓐ 행동: 바람·방향 고려 미흡, 작업자 하향살포\nⓔ 환경: 고온·강풍, 비 예보\nⓢ 물질 :  고독성 농약, 미세비산\nⓜ 장비 :  노즐 막힘·역분사, 압력불안정", case: "사례3: 경사지·비포장 지면에서 미끄러짐, 장비 전도", preSeverity: 3, preFrequency: 3, weight: 2 } ] },
+      { task: '방제', subTask: '장비 세척', risks: [ { id: 'pesticide_clean_1', description: "ⓐ 행동: 고압세척 시 반사·튀김 주의 미흡\nⓔ 환경: 물 고임, 미끄럼 위험\nⓢ 물질 :  잔류 농약 용액, 오염수\nⓜ 장비 :  고압호스 파손, 누수", case: "사례1: 세척 중 호스 파손으로 고압 농약수 분사, 피부·안구 노출", preSeverity: 3, preFrequency: 3, weight: 2 }, { id: 'pesticide_clean_2', description: "ⓐ 행동: 고압세척 시 반사·튀김 주의 미흡\nⓔ 환경: 물 고임, 미끄럼 위험\nⓢ 물질 :  잔류 농약 용액, 오염수\nⓜ 장비 :  고압호스 파손, 누수", case: "사례2: 바닥 물 고임으로 미끄러짐, 장비 낙하", preSeverity: 3, preFrequency: 3, weight: 2 }, { id: 'pesticide_clean_3', description: "ⓐ 행동: 고압세척 시 반사·튀김 주의 미흡\nⓔ 환경: 물 고임, 미끄럼 위험\nⓢ 물질 :  잔류 농약 용액, 오염수\nⓜ 장비 :  고압호스 파손, 누수", case: "사례3: 세척 중 펌프 작동 상태에서 호스 탈락", preSeverity: 3, preFrequency: 2, weight: 2 } ] },
+      { task: '방제', subTask: '잔량·폐기물 처리', risks: [ { id: 'pesticide_waste_1', description: "ⓐ 행동: 잔량 폐액 무단 방류, 소각\nⓔ 환경: 바람 방향 고려 없이 소각, 배수구 근처 폐액 방류\nⓢ 물질 :  고농도 폐액, 독성 연기\nⓜ 장비 :  소각장비 파손, 유출 방지장치 미작동", case: "사례1: 폐액을 배수구에 방류해 하천 오염", preSeverity: 3, preFrequency: 4, weight: 2 }, { id: 'pesticide_waste_2', description: "ⓐ 행동: 잔량 폐액 무단 방류, 소각\nⓔ 환경: 바람 방향 고려 없이 소각, 배수구 근처 폐액 방류\nⓢ 물질 :  고농도 폐액, 독성 연기\nⓜ 장비 :  소각장비 파손, 유출 방지장치 미작동", case: "사례2: 바람 불 때 소각하여 독성 연기 인근 주택 유입", preSeverity: 3, preFrequency: 3, weight: 2 }, { id: 'pesticide_waste_3', description: "ⓐ 행동: 잔량 폐액 무단 방류, 소각\nⓔ 환경: 바람 방향 고려 없이 소각, 배수구 근처 폐액 방류\nⓢ 물질 :  고농도 폐액, 독성 연기\nⓜ 장비 :  소각장비 파손, 유출 방지장치 미작동", case: "사례3: 폐액 운반 중 용기 파손, 누출 발생", preSeverity: 3, preFrequency: 3, weight: 2 } ] },
+      { task: '수확', subTask: '과수 수확', risks: [ { id: 'harvest_fruit_1', description: "ⓐ 행동: 사다리 이동 중 균형 상실, 무리한 손 뻗기, 한 손 작업\nⓔ 환경: 젖은 지면·낙엽, 강풍·일사, 그늘 부족\nⓢ 물질 :  농약 잔류 과실·수액 접촉\nⓜ 장비 :  사다리 미고정, 수확바구니·집게 파손", case: "사례1: 사다리에서 과실 따다 몸을 과도하게 뻗어 추락", preSeverity: 4, preFrequency: 3, weight: 3 }, { id: 'harvest_fruit_2', description: "ⓐ 행동: 사다리 이동 중 균형 상실, 무리한 손 뻗기, 한 손 작업\nⓔ 환경: 젖은 지면·낙엽, 강풍·일사, 그늘 부족\nⓢ 물질 :  농약 잔류 과실·수액 접촉\nⓜ 장비 :  사다리 미고정, 수확바구니·집게 파손", case: "사례2: 비 온 뒤 젖은 지면에서 발판 미끄러짐", preSeverity: 3, preFrequency: 4, weight: 2 }, { id: 'harvest_fruit_3', description: "ⓐ 행동: 사다리 이동 중 균형 상실, 무리한 손 뻗기, 한 손 작업\nⓔ 환경: 젖은 지면·낙엽, 강풍·일사, 그늘 부족\nⓢ 물질 :  농약 잔류 과실·수액 접촉\nⓜ 장비 :  사다리 미고정, 수확바구니·집게 파손", case: "사례3: 바구니 들고 사다리 오르내리다 발 헛딤", preSeverity: 3, preFrequency: 3, weight: 2 } ] },
+      { task: '수확', subTask: '곡물 수확/탈곡', risks: [ { id: 'harvest_grain_1', description: "ⓐ 행동: 콤바인·탈곡기 회전부 근접, 막힘 제거 시 손 삽입\nⓔ 환경: 분진 다량, 시야 제한, 협소 작업구역\nⓢ 물질 :  곡물 분진·곰팡이 포자, 농약 잔류\nⓜ 장비 :  보호덮개 미장착, 비상정지 미작동", case: "사례1: 콤바인 작동 중 막힘 제거하다 손 끼임", preSeverity: 4, preFrequency: 2, weight: 3 }, { id: 'harvest_grain_2', description: "ⓐ 행동: 콤바인·탈곡기 회전부 근접, 막힘 제거 시 손 삽입\nⓔ 환경: 분진 다량, 시야 제한, 협소 작업구역\nⓢ 물질 :  곡물 분진·곰팡이 포자, 농약 잔류\nⓜ 장비 :  보호덮개 미장착, 비상정지 미작동", case: "사례2: 탈곡기 투입구에 손 넣다 협착·절단", preSeverity: 4, preFrequency: 3, weight: 3 }, { id: 'harvest_grain_3', description: "ⓐ 행동: 콤바인·탈곡기 회전부 근접, 막힘 제거 시 손 삽입\nⓔ 환경: 분진 다량, 시야 제한, 협소 작업구역\nⓢ 물질 :  곡물 분진·곰팡이 포자, 농약 잔류\nⓜ 장비 :  보호덮개 미장착, 비상정지 미작동", case: "사례3: 분진 많은 ⓔ 환경에서 장시간 작업으로 흡입·안구 자극", preSeverity: 3, preFrequency: 4, weight: 2 } ] },
+      { task: '수확', subTask: '채소 수확(손수확)', risks: [ { id: 'harvest_veg_1', description: "ⓐ 행동: 장시간 숙임·쪼그림, 허리 비틀기, 칼·가위 사용\nⓔ 환경: 진흙·물기, 고온·자외선, 협소 이랑\nⓢ 물질 :  흙먼지·병원체, 농약 잔류\nⓜ 장비 :  칼날 손상·덮개 미사용", case: "사례1: 절단 도중 손가락 베임", preSeverity: 3, preFrequency: 3, weight: 2 }, { id: 'harvest_veg_2', description: "ⓐ 행동: 장시간 숙임·쪼그림, 허리 비틀기, 칼·가위 사용\nⓔ 환경: 진흙·물기, 고온·자외선, 협소 이랑\nⓢ 물질 :  흙먼지·병원체, 농약 잔류\nⓜ 장비 :  칼날 손상·덮개 미사용", case: "사례2: 진흙밭에서 이동 중 미끄러져 넘어짐", preSeverity: 3, preFrequency: 4, weight: 2 }, { id: 'harvest_veg_3', description: "ⓐ 행동: 장시간 숙임·쪼그림, 허리 비틀기, 칼·가위 사용\nⓔ 환경: 진흙·물기, 고온·자외선, 협소 이랑\nⓢ 물질 :  흙먼지·병원체, 농약 잔류\nⓜ 장비 :  칼날 손상·덮개 미사용", case: "사례3: 한낮 고온에 장시간 숙임으로 허리 통증·열 스트레스", preSeverity: 4, preFrequency: 4, weight: 1 } ] },
+      { task: '수확', subTask: '선별·1차 포장', risks: [ { id: 'harvest_sort_1', description: "ⓐ 행동: 장시간 서서 작업, 손목·손가락 반복동작, 상부 적재\nⓔ 환경: 환기 부족·조명 불량, 협소 작업대\nⓢ 물질 :  먼지·포장재 화학성분(접착제 등)\nⓜ 장비 :  컨베이어·롤러 끼임, 박스 절단면", case: "사례1: 컨베이어 롤러와 박스 사이에 손가락 끼임", preSeverity: 3, preFrequency: 3, weight: 2 }, { id: 'harvest_sort_2', description: "ⓐ 행동: 장시간 서서 작업, 손목·손가락 반복동작, 상부 적재\nⓔ 환경: 환기 부족·조명 불량, 협소 작업대\nⓢ 물질 :  먼지·포장재 화학성분(접착제 등)\nⓜ 장비 :  컨베이어·롤러 끼임, 박스 절단면", case: "사례2: 고중량 박스를 어깨 위로 적재하다 허리 과부하", preSeverity: 3, preFrequency: 3, weight: 2 }, { id: 'harvest_sort_3', description: "ⓐ 행동: 장시간 서서 작업, 손목·손가락 반복동작, 상부 적재\nⓔ 환경: 환기 부족·조명 불량, 협소 작업대\nⓢ 물질 :  먼지·포장재 화학성분(접착제 등)\nⓜ 장비 :  컨베이어·롤러 끼임, 박스 절단면", case: "사례3: 환기 불량 구역에서 장시간 선별로 어지럼·피로", preSeverity: 3, preFrequency: 4, weight: 1 } ] },
+      { task: '운반', subTask: '인력 운반', risks: [ { id: 'transport_manual_1', description: "ⓐ 행동: 무리한 중량 운반, 허리·무릎 비틀림, 협소 공간에서 방향 전환\nⓔ 환경: 비포장·경사로, 미끄럼 위험\nⓢ 물질 :  젖은 농산물, 포장재 날카로움\nⓜ 장비 :  손수레·바구니 손잡이 파손", case: "사례1: 비포장 경사로에서 무거운 박스 운반 중 미끄러짐", preSeverity: 3, preFrequency: 4, weight: 2 }, { id: 'transport_manual_2', description: "ⓐ 행동: 무리한 중량 운반, 허리·무릎 비틀림, 협소 공간에서 방향 전환\nⓔ 환경: 비포장·경사로, 미끄럼 위험\nⓢ 물질 :  젖은 농산물, 포장재 날카로움\nⓜ 장비 :  손수레·바구니 손잡이 파손", case: "사례2: 협소 통로에서 방향 전환 시 허리 비틀림", preSeverity: 3, preFrequency: 3, weight: 2 }, { id: 'transport_manual_3', description: "ⓐ 행동: 무리한 중량 운반, 허리·무릎 비틀림, 협소 공간에서 방향 전환\nⓔ 환경: 비포장·경사로, 미끄럼 위험\nⓢ 물질 :  젖은 농산물, 포장재 날카로움\nⓜ 장비 :  손수레·바구니 손잡이 파손", case: "사례3: 젖은 포장재의 날카로운 모서리에 손 베임", preSeverity: 3, preFrequency: 3, weight: 2 } ] },
+      { task: '운반', subTask: '기계 운반', risks: [ { id: 'transport_machine_1', description: "ⓐ 행동: 과속 운행, 과적, 시야 확보 불량\nⓔ 환경: 진입로 장애물, 비·눈·진흙길\nⓢ 물질 :  낙하물 파편\nⓜ 장비 :  트랙터·지게차 브레이크 불량", case: "사례1: 지게차 과적 상태로 경사로 주행 중 전도", preSeverity: 4, preFrequency: 3, weight: 3 }, { id: 'transport_machine_2', description: "ⓐ 행동: 과속 운행, 과적, 시야 확보 불량\nⓔ 환경: 진입로 장애물, 비·눈·진흙길\nⓢ 물질 :  낙하물 파편\nⓜ 장비 :  트랙터·지게차 브레이크 불량", case: "사례2: 트랙터 진입로 장애물 미제거로 전방 충돌", preSeverity: 3, preFrequency: 3, weight: 2 }, { id: 'transport_machine_3', description: "ⓐ 행동: 과속 운행, 과적, 시야 확보 불량\nⓔ 환경: 진입로 장애물, 비·눈·진흙길\nⓢ 물질 :  낙하물 파편\nⓜ 장비 :  트랙터·지게차 브레이크 불량", case: "사례3: 비 오는 날 진흙길 주행 중 미끄러짐", preSeverity: 3, preFrequency: 4, weight: 2 } ] },
+      { task: '운반', subTask: '하역 작업', risks: [ { id: 'transport_load_1', description: "ⓐ 행동: 고중량 적재물 상·하차 부주의, 손·발 끼임\nⓔ 환경: 협소 적재구역, 바닥 정리 미흡\nⓢ 물질 :  농산물 포대 파손, 내용물 흩어짐\nⓜ 장비 :  리프트·컨베이어 오작동", case: "사례1: 리프트 작동 중 발 끼임", preSeverity: 4, preFrequency: 3, weight: 2 }, { id: 'transport_load_2', description: "ⓐ 행동: 고중량 적재물 상·하차 부주의, 손·발 끼임\nⓔ 환경: 협소 적재구역, 바닥 정리 미흡\nⓢ 물질 :  농산물 포대 파손, 내용물 흩어짐\nⓜ 장비 :  리프트·컨베이어 오작동", case: "사례2: 컨베이어 위 적재물 불균형으로 낙하", preSeverity: 3, preFrequency: 3, weight: 2 }, { id: 'transport_load_3', description: "ⓐ 행동: 고중량 적재물 상·하차 부주의, 손·발 끼임\nⓔ 환경: 협소 적재구역, 바닥 정리 미흡\nⓢ 물질 :  농산물 포대 파손, 내용물 흩어짐\nⓜ 장비 :  리프트·컨베이어 오작동", case: "사례3: 포대 파손으로 내용물 흩어져 미끄러짐", preSeverity: 3, preFrequency: 3, weight: 2 } ] },
+      { task: '정리·포장', subTask: '선별 작업', risks: [ { id: 'sort_pack_1', description: "ⓐ 행동: 반복적 손목·어깨 사용, 불량품 제거 시 칼·가위 부주의\nⓔ 환경: 조명 불량, 협소 작업공간\nⓢ 물질 :  먼지·이물질 노출\nⓜ 장비 :  컨베이어·선별대 끼임 위험", case: "사례1: 컨베이어 선별 중 손목 과사용으로 통증 발생", preSeverity: 2, preFrequency: 4, weight: 2 }, { id: 'sort_pack_2', description: "ⓐ 행동: 반복적 손목·어깨 사용, 불량품 제거 시 칼·가위 부주의\nⓔ 환경: 조명 불량, 협소 작업공간\nⓢ 물질 :  먼지·이물질 노출\nⓜ 장비 :  컨베이어·선별대 끼임 위험", case: "사례2: 불량품 제거 중 칼 사용 부주의로 손 베임", preSeverity: 4, preFrequency: 3, weight: 3 }, { id: 'sort_pack_3', description: "ⓐ 행동: 반복적 손목·어깨 사용, 불량품 제거 시 칼·가위 부주의\nⓔ 환경: 조명 불량, 협소 작업공간\nⓢ 물질 :  먼지·이물질 노출\nⓜ 장비 :  컨베이어·선별대 끼임 위험", case: "사례3: 조명 불량으로 불량품 식별 어려움, 눈 피로", preSeverity: 2, preFrequency: 3, weight: 1 } ] },
+      { task: '정리·포장', subTask: '포장 작업', risks: [ { id: 'sort_pack_4', description: "ⓐ 행동: 반복적 허리 숙임, 과도한 힘 사용, 테이프·포장재 절단 시 부주의\nⓔ 환경: 협소 공간, 바닥 적재물 방치\nⓢ 물질 :  플라스틱 끈·포장재 날카로움\nⓜ 장비 :  포장기계 말림·끼임 위험", case: "사례1: 포장기계 작동 중 손가락 끼임", preSeverity: 4, preFrequency: 3, weight: 2 }, { id: 'sort_pack_5', description: "ⓐ 행동: 반복적 허리 숙임, 과도한 힘 사용, 테이프·포장재 절단 시 부주의\nⓔ 환경: 협소 공간, 바닥 적재물 방치\nⓢ 물질 :  플라스틱 끈·포장재 날카로움\nⓜ 장비 :  포장기계 말림·끼임 위험", case: "사례2: 반복 숙임 작업으로 허리 통증", preSeverity: 3, preFrequency: 4, weight: 2 }, { id: 'sort_pack_6', description: "ⓐ 행동: 반복적 허리 숙임, 과도한 힘 사용, 테이프·포장재 절단 시 부주의\nⓔ 환경: 협소 공간, 바닥 적재물 방치\nⓢ 물질 :  플라스틱 끈·포장재 날카로움\nⓜ 장비 :  포장기계 말림·끼임 위험", case: "사례3: 포장재 절단 시 손 베임", preSeverity: 3, preFrequency: 3, weight: 2 } ] },
+      { task: '정리·포장', subTask: '라벨·인쇄', risks: [ { id: 'sort_pack_7', description: "ⓐ 행동: 라벨 부착 반복작업, 인쇄기 점검 시 손 끼임\nⓔ 환경: 인쇄 잉크 냄새, 환기 불량\nⓢ 물질 :  잉크·접착제 피부 자극\nⓜ 장비 :  라벨러·프린터 롤러 끼임", case: "사례1: 라벨러 롤러 점검 중 손 끼임", preSeverity: 3, preFrequency: 3, weight: 2 }, { id: 'sort_pack_8', description: "ⓐ 행동: 라벨 부착 반복작업, 인쇄기 점검 시 손 끼임\nⓔ 환경: 인쇄 잉크 냄새, 환기 불량\nⓢ 물질 :  잉크·접착제 피부 자극\nⓜ 장비 :  라벨러·프린터 롤러 끼임", case: "사례2: 잉크 취급 중 피부 자극·알레르기", preSeverity: 2, preFrequency: 4, weight: 1 }, { id: 'sort_pack_9', description: "ⓐ 행동: 라벨 부착 반복작업, 인쇄기 점검 시 손 끼임\nⓔ 환경: 인쇄 잉크 냄새, 환기 불량\nⓢ 물질 :  잉크·접착제 피부 자극\nⓜ 장비 :  라벨러·프린터 롤러 끼임", case: "사례3: 반복 작업으로 손목·팔꿈치 통증", preSeverity: 2, preFrequency: 4, weight: 1 } ] },
+      { task: '파종·정식', subTask: '밭·하우스 준비', risks: [ { id: 'seeding_prep_1', description: "ⓐ 행동: 밭 고르기·이랑 만들기 시 허리·어깨 무리, 굽힘·비틀림 반복\nⓔ 환경: 고온·저온, 직사광선, 비포장 경사면\nⓢ 물질 :  흙먼지, 비료 분진\nⓜ 장비 :  관리기·로터리 날 접촉, 경운기 전도 위험", case: "사례1: 경사면에서 관리기 사용 중 미끄러짐·전도", preSeverity: 4, preFrequency: 3, weight: 3 }, { id: 'seeding_prep_2', description: "ⓐ 행동: 밭 고르기·이랑 만들기 시 허리·어깨 무리, 굽힘·비틀림 반복\nⓔ 환경: 고온·저온, 직사광선, 비포장 경사면\nⓢ 물질 :  흙먼지, 비료 분진\nⓜ 장비 :  관리기·로터리 날 접촉, 경운기 전도 위험", case: "사례2: 로터리 날 점검 중 전원 미차단으로 손 부상", preSeverity: 4, preFrequency: 3, weight: 2 }, { id: 'seeding_prep_3', description: "ⓐ 행동: 밭 고르기·이랑 만들기 시 허리·어깨 무리, 굽힘·비틀림 반복\nⓔ 환경: 고온·저온, 직사광선, 비포장 경사면\nⓢ 물질 :  흙먼지, 비료 분진\nⓜ 장비 :  관리기·로터리 날 접촉, 경운기 전도 위험", case: "사례3: 장시간 굽힘 작업으로 허리 통증", preSeverity: 3, preFrequency: 4, weight: 2 } ] },
+      { task: '파종·정식', subTask: '파종', risks: [ { id: 'seeding_seed_1', description: "ⓐ 행동: 손파종 시 손목·손가락 과사용, 무릎 꿇기 장시간 지속\nⓔ 환경: 고온·저온, 장시간 일광 노출\nⓢ 물질 :  씨앗 소독제 접촉 가능\nⓜ 장비 :  파종기 끼임, 오작동", case: "사례1: 파종기 투입구 점검 중 손 끼임", preSeverity: 3, preFrequency: 3, weight: 2 }, { id: 'seeding_seed_2', description: "ⓐ 행동: 손파종 시 손목·손가락 과사용, 무릎 꿇기 장시간 지속\nⓔ 환경: 고온·저온, 장시간 일광 노출\nⓢ 물질 :  씨앗 소독제 접촉 가능\nⓜ 장비 :  파종기 끼임, 오작동", case: "사례2: 손파종 장시간 지속으로 손목·무릎 통증", preSeverity: 3, preFrequency: 4, weight: 2 }, { id: 'seeding_seed_3', description: "ⓐ 행동: 손파종 시 손목·손가락 과사용, 무릎 꿇기 장시간 지속\nⓔ 환경: 고온·저온, 장시간 일광 노출\nⓢ 물질 :  씨앗 소독제 접촉 가능\nⓜ 장비 :  파종기 끼임, 오작동", case: "사례3: 씨앗 소독액 취급 중 피부 자극", preSeverity: 3, preFrequency: 3, weight: 2 } ] },
+      { task: '파종·정식', subTask: '모판 이송·정식', risks: [ { id: 'seeding_transplant_1', description: "ⓐ 행동: 무거운 모판 반복 운반, 허리 굽힘·비틀림\nⓔ 환경: 습지·진흙길 미끄럼\nⓢ 물질 :  비료·농약 잔류 토양 접촉\nⓜ 장비 :  이식기 끼임, 부품 탈락", case: "사례1: 이식기 작동 중 손 끼임", preSeverity: 4, preFrequency: 2, weight: 2 }, { id: 'seeding_transplant_2', description: "ⓐ 행동: 무거운 모판 반복 운반, 허리 굽힘·비틀림\nⓔ 환경: 습지·진흙길 미끄럼\nⓢ 물질 :  비료·농약 잔류 토양 접촉\nⓜ 장비 :  이식기 끼임, 부품 탈락", case: "사례2: 진흙길에서 미끄러져 넘어짐", preSeverity: 3, preFrequency: 3, weight: 2 }, { id: 'seeding_transplant_3', description: "ⓐ 행동: 무거운 모판 반복 운반, 허리 굽힘·비틀림\nⓔ 환경: 습지·진흙길 미끄럼\nⓢ 물질 :  비료·농약 잔류 토양 접촉\nⓜ 장비 :  이식기 끼임, 부품 탈락", case: "사례3: 반복 운반으로 허리·어깨 통증", preSeverity: 3, preFrequency: 4, weight: 2 } ] },
+      { task: '관리', subTask: '비료 준비·살포', risks: [ { id: 'manage_fertilize_1', description: "ⓐ 행동: 중량 비료 운반, 들기·내리기 반복, 허리 굽힘\nⓔ 환경: 고온·직사광선, 비포장길 미끄럼\nⓢ 물질 :  비료 분진·가스 발생, 피부 자극\nⓜ 장비 :  살포기 끼임·막힘, 호퍼 오작동", case: "사례1: 비료 살포기 투입구 점검 중 손 끼임", preSeverity: 3, preFrequency: 3, weight: 2 }, { id: 'manage_fertilize_2', description: "ⓐ 행동: 중량 비료 운반, 들기·내리기 반복, 허리 굽힘\nⓔ 환경: 고온·직사광선, 비포장길 미끄럼\nⓢ 물질 :  비료 분진·가스 발생, 피부 자극\nⓜ 장비 :  살포기 끼임·막힘, 호퍼 오작동", case: "사례2: 비료 봉투(25kg) 장시간 반복 운반으로 허리 통증", preSeverity: 3, preFrequency: 4, weight: 2 }, { id: 'manage_fertilize_3', description: "ⓐ 행동: 중량 비료 운반, 들기·내리기 반복, 허리 굽힘\nⓔ 환경: 고온·직사광선, 비포장길 미끄럼\nⓢ 물질 :  비료 분진·가스 발생, 피부 자극\nⓜ 장비 :  살포기 끼임·막힘, 호퍼 오작동", case: "사례3: 비료 분진 흡입으로 호흡기 자극", preSeverity: 3, preFrequency: 3, weight: 2 } ] },
+      { task: '관리', subTask: '병해충 점검', risks: [ { id: 'manage_pest_1', description: "ⓐ 행동: 장시간 숙이거나 들어올림, 예리한 식물 부위 접촉\nⓔ 환경: 고온다습 하우스, 곤충 다량 발생\nⓢ 물질 :  알레르기 유발 식물수액, 곤충 배설물\nⓜ 장비 :  확대경·측정기 파손 시 파편 위험", case: "사례1: 하우스 내 장시간 숙인 자세로 목·허리 통증", preSeverity: 2, preFrequency: 4, weight: 2 }, { id: 'manage_pest_2', description: "ⓐ 행동: 장시간 숙이거나 들어올림, 예리한 식물 부위 접촉\nⓔ 환경: 고온다습 하우스, 곤충 다량 발생\nⓢ 물질 :  알레르기 유발 식물수액, 곤충 배설물\nⓜ 장비 :  확대경·측정기 파손 시 파편 위험", case: "사례2: 병든 작물 제거 중 날카로운 줄기에 손 베임", preSeverity: 3, preFrequency: 3, weight: 2 }, { id: 'manage_pest_3', description: "ⓐ 행동: 장시간 숙이거나 들어올림, 예리한 식물 부위 접촉\nⓔ 환경: 고온다습 하우스, 곤충 다량 발생\nⓢ 물질 :  알레르기 유발 식물수액, 곤충 배설물\nⓜ 장비 :  확대경·측정기 파손 시 파편 위험", case: "사례3: 해충 포획기 점검 중 파손으로 손 찔림", preSeverity: 3, preFrequency: 2, weight: 2 } ] },
+      { task: '관리', subTask: '잡초제거', risks: [ { id: 'manage_weed_1', description: "ⓐ 행동: 예취기·제초칼 사용 시 베임·끼임, 장시간 굽힘\nⓔ 환경: 고온, 경사지 미끄럼\nⓢ 물질 :  제초제 접촉 가능\nⓜ 장비 :  예취기 날 탈락, 연료 누출", case: "사례1: 예취기 날 파손으로 파편 튐", preSeverity: 3, preFrequency: 3, weight: 2 }, { id: 'manage_weed_2', description: "ⓐ 행동: 예취기·제초칼 사용 시 베임·끼임, 장시간 굽힘\nⓔ 환경: 고온, 경사지 미끄럼\nⓢ 물질 :  제초제 접촉 가능\nⓜ 장비 :  예취기 날 탈락, 연료 누출", case: "사례2: 장시간 굽힘 작업으로 허리 통증", preSeverity: 2, preFrequency: 4, weight: 2 }, { id: 'manage_weed_3', description: "ⓐ 행동: 예취기·제초칼 사용 시 베임·끼임, 장시간 굽힘\nⓔ 환경: 고온, 경사지 미끄럼\nⓢ 물질 :  제초제 접촉 가능\nⓜ 장비 :  예취기 날 탈락, 연료 누출", case: "사례3: 경사지에서 예취기 사용 중 미끄러짐", preSeverity: 3, preFrequency: 3, weight: 2 } ] },
+      { task: '관리', subTask: '생육관리(유인·가지치기 등)', risks: [ { id: 'manage_growth_1', description: "ⓐ 행동: 사다리 오르내림 반복, 어깨 높이 이상 작업\nⓔ 환경: 고온다습, 환기 불량\nⓢ 물질 :  식물수액 피부 접촉\nⓜ 장비 :  가위·전정기 날 파손", case: "사례1: 사다리 불안정 상태에서 유인 작업 중 추락", preSeverity: 4, preFrequency: 3, weight: 3 }, { id: 'manage_growth_2', description: "ⓐ 행동: 사다리 오르내림 반복, 어깨 높이 이상 작업\nⓔ 환경: 고온다습, 환기 불량\nⓢ 물질 :  식물수액 피부 접촉\nⓜ 장비 :  가위·전정기 날 파손", case: "사례2: 전정기 작동 중 날 파손으로 파편 튐", preSeverity: 3, preFrequency: 3, weight: 2 }, { id: 'manage_growth_3', description: "ⓐ 행동: 사다리 오르내림 반복, 어깨 높이 이상 작업\nⓔ 환경: 고온다습, 환기 불량\nⓢ 물질 :  식물수액 피부 접촉\nⓜ 장비 :  가위·전정기 날 파손", case: "사례3: 장시간 팔 위로 작업으로 어깨 근육통", preSeverity: 2, preFrequency: 4, weight: 2 } ] },
+      { task: '제초·토양관리', subTask: '기계 제초', risks: [ { id: 'soil_weed_1', description: "ⓐ 행동: 예취기·로터리날 접촉, 장시간 진동 노출\nⓔ 환경: 경사지·습지 미끄럼, 돌·이물 튐\nⓢ 물질 :  연료 증기 흡입, 제초제 비산\nⓜ 장비 :  날 탈락, 기계 전도", case: "사례1: 예취기 날 파손 → 파편이 얼굴로 튐", preSeverity: 3, preFrequency: 3, weight: 2 }, { id: 'soil_weed_2', description: "ⓐ 행동: 예취기·로터리날 접촉, 장시간 진동 노출\nⓔ 환경: 경사지·습지 미끄럼, 돌·이물 튐\nⓢ 물질 :  연료 증기 흡입, 제초제 비산\nⓜ 장비 :  날 탈락, 기계 전도", case: "사례2: 경사지에서 예취기 사용 중 전도", preSeverity: 3, preFrequency: 3, weight: 2 }, { id: 'soil_weed_3', description: "ⓐ 행동: 예취기·로터리날 접촉, 장시간 진동 노출\nⓔ 환경: 경사지·습지 미끄럼, 돌·이물 튐\nⓢ 물질 :  연료 증기 흡입, 제초제 비산\nⓜ 장비 :  날 탈락, 기계 전도", case: "사례3: 장시간 사용으로 손·팔 저림(진동 증후군 위험)", preSeverity: 2, preFrequency: 4, weight: 2 } ] },
+      { task: '제초·토양관리', subTask: '수동 제초', risks: [ { id: 'soil_weed_4', description: "ⓐ 행동: 예리한 칼·낫 사용 시 베임, 허리·무릎 반복 굽힘\nⓔ 환경: 고온, 습지대\nⓢ 물질 :  가시·독성 식물 접촉\nⓜ 장비 :  칼날 파손", case: "사례1: 낫 사용 중 손가락 베임", preSeverity: 3, preFrequency: 3, weight: 2 }, { id: 'soil_weed_5', description: "ⓐ 행동: 예리한 칼·낫 사용 시 베임, 허리·무릎 반복 굽힘\nⓔ 환경: 고온, 습지대\nⓢ 물질 :  가시·독성 식물 접촉\nⓜ 장비 :  칼날 파손", case: "사례2: 장시간 허리 굽힘으로 허리·무릎 통증", preSeverity: 2, preFrequency: 4, weight: 2 }, { id: 'soil_weed_6', description: "ⓐ 행동: 예리한 칼·낫 사용 시 베임, 허리·무릎 반복 굽힘\nⓔ 환경: 고온, 습지대\nⓢ 물질 :  가시·독성 식물 접촉\nⓜ 장비 :  칼날 파손", case: "사례3: 가시 식물 뽑는 중 피부 찔림", preSeverity: 3, preFrequency: 3, weight: 2 } ] },
+      { task: '제초·토양관리', subTask: '경운·정지', risks: [ { id: 'soil_weed_7', description: "ⓐ 행동: 경운기·트랙터 접촉, 역주행 위험\nⓔ 환경: 비포장 불규칙 지형, 돌·파편 튐\nⓢ 물질 :  연료·배기가스 노출\nⓜ 장비 :  로터리날 감김, PTO 샤프트 노출", case: "사례1: PTO 샤프트 보호커버 미설치로 옷 끼임", preSeverity: 4, preFrequency: 3, weight: 3 }, { id: 'soil_weed_8', description: "ⓐ 행동: 경운기·트랙터 접촉, 역주행 위험\nⓔ 환경: 비포장 불규칙 지형, 돌·파편 튐\nⓢ 물질 :  연료·배기가스 노출\nⓜ 장비 :  로터리날 감김, PTO 샤프트 노출", case: "사례2: 경운 중 돌 튐으로 안면 부상", preSeverity: 3, preFrequency: 3, weight: 2 }, { id: 'soil_weed_9', description: "ⓐ 행동: 경운기·트랙터 접촉, 역주행 위험\nⓔ 환경: 비포장 불규칙 지형, 돌·파편 튐\nⓢ 물질 :  연료·배기가스 노출\nⓜ 장비 :  로터리날 감김, PTO 샤프트 노출", case: "사례3: 경사지 경운 시 기계 전도", preSeverity: 4, preFrequency: 3, weight: 3 } ] },
+      { task: '제초·토양관리', subTask: '시비·토양개량', risks: [ { id: 'soil_weed_10', description: "ⓐ 행동: 비료·개량제 투입 시 분진 흡입, 무거운 자루 반복 운반\nⓔ 환경: 고온·직사광선\nⓢ 물질 :  화학비료·석회 분진, 피부 자극\nⓜ 장비 :  살포기 막힘·역분사", case: "사례1: 개량제 투입 중 분진 다량 흡입", preSeverity: 2, preFrequency: 4, weight: 2 }, { id: 'soil_weed_11', description: "ⓐ 행동: 비료·개량제 투입 시 분진 흡입, 무거운 자루 반복 운반\nⓔ 환경: 고온·직사광선\nⓢ 물질 :  화학비료·석회 분진, 피부 자극\nⓜ 장비 :  살포기 막힘·역분사", case: "사례2: 25kg 비료 반복 운반으로 허리 통증", preSeverity: 3, preFrequency: 4, weight: 2 }, { id: 'soil_weed_12', description: "ⓐ 행동: 비료·개량제 투입 시 분진 흡입, 무거운 자루 반복 운반\nⓔ 환경: 고온·직사광선\nⓢ 물질 :  화학비료·석회 분진, 피부 자극\nⓜ 장비 :  살포기 막힘·역분사", case: "사례3: 살포기 막힘 점검 중 손 끼임", preSeverity: 3, preFrequency: 3, weight: 2 } ] },
+      { task: '기계운전형', subTask: '트랙터 운전', risks: [ { id: 'machine_drive_1', description: "ⓐ 행동: 고속 주행, 회전 시 급조향, 작업 중 하차\nⓔ 환경: 경사지, 비포장·진흙길, 시야 불량\nⓢ 물질 :  배기가스·분진 흡입\nⓜ 장비 :  브레이크·조향계통 불량, 전도방지구조 미비", case: "사례1: 경사지에서 속도 줄이지 않고 회전하다 전도", preSeverity: 4, preFrequency: 3, weight: 3 }, { id: 'machine_drive_2', description: "ⓐ 행동: 고속 주행, 회전 시 급조향, 작업 중 하차\nⓔ 환경: 경사지, 비포장·진흙길, 시야 불량\nⓢ 물질 :  배기가스·분진 흡입\nⓜ 장비 :  브레이크·조향계통 불량, 전도방지구조 미비", case: "사례2: 야간 조명 불량으로 장애물 충돌", preSeverity: 3, preFrequency: 3, weight: 2 }, { id: 'machine_drive_3', description: "ⓐ 행동: 고속 주행, 회전 시 급조향, 작업 중 하차\nⓔ 환경: 경사지, 비포장·진흙길, 시야 불량\nⓢ 물질 :  배기가스·분진 흡입\nⓜ 장비 :  브레이크·조향계통 불량, 전도방지구조 미비", case: "사례3: PTO 작동 중 하차하다 옷 끼임", preSeverity: 4, preFrequency: 3, weight: 3 } ] },
+      { task: '기계운전형', subTask: '콤바인 운전', risks: [ { id: 'machine_drive_4', description: "ⓐ 행동: 탈곡부·커터부 접근, 작업 중 청소·점검\nⓔ 환경: 습지·진흙길, 곡물먼지 다량 발생\nⓢ 물질 :  곡물 분진, 곰팡이 포자\nⓜ 장비 :  칼날·체인 노출, 이물 끼임", case: "사례1: 작동 중 탈곡부 이물 제거하다 손 끼임", preSeverity: 4, preFrequency: 3, weight: 3 }, { id: 'machine_drive_5', description: "ⓐ 행동: 탈곡부·커터부 접근, 작업 중 청소·점검\nⓔ 환경: 습지·진흙길, 곡물먼지 다량 발생\nⓢ 물질 :  곡물 분진, 곰팡이 포자\nⓜ 장비 :  칼날·체인 노출, 이물 끼임", case: "사례2: 습지대에서 주행 중 전도", preSeverity: 3, preFrequency: 3, weight: 2 }, { id: 'machine_drive_6', description: "ⓐ 행동: 탈곡부·커터부 접근, 작업 중 청소·점검\nⓔ 환경: 습지·진흙길, 곡물먼지 다량 발생\nⓢ 물질 :  곡물 분진, 곰팡이 포자\nⓜ 장비 :  칼날·체인 노출, 이물 끼임", case: "사례3: 먼지 마스크 미착용으로 곰팡이 알레르기 발현", preSeverity: 3, preFrequency: 4, weight: 2 } ] },
+      { task: '기계운전형', subTask: '운반차·지게차 운전', risks: [ { id: 'machine_drive_7', description: "ⓐ 행동: 과적, 편중 적재, 고속 커브 주행\nⓔ 환경: 협소 공간, 경사로\nⓢ 물질 :  배기가스, 분진\nⓜ 장비 :  브레이크 불량, 전복 방지구조 미흡", case: "사례1: 과적 상태에서 경사로 하행 중 전도", preSeverity: 4, preFrequency: 3, weight: 3 }, { id: 'machine_drive_8', description: "ⓐ 행동: 과적, 편중 적재, 고속 커브 주행\nⓔ 환경: 협소 공간, 경사로\nⓢ 물질 :  배기가스, 분진\nⓜ 장비 :  브레이크 불량, 전복 방지구조 미흡", case: "사례2: 적재물 편중으로 급커브 시 낙하", preSeverity: 3, preFrequency: 3, weight: 2 }, { id: 'machine_drive_9', description: "ⓐ 행동: 과적, 편중 적재, 고속 커브 주행\nⓔ 환경: 협소 공간, 경사로\nⓢ 물질 :  배기가스, 분진\nⓜ 장비 :  브레이크 불량, 전복 방지구조 미흡", case: "사례3: 협소 통로 주행 중 벽면 충돌", preSeverity: 3, preFrequency: 3, weight: 2 } ] },
+      { task: '기계운전형', subTask: '기타 농기계 운전', risks: [ { id: 'machine_drive_10', description: "ⓐ 행동: 작업 중 휴대폰 사용, 한 손 운전\nⓔ 환경: 비·눈·강풍 시 작업\nⓢ 물질 :  윤활유·연료 누출\nⓜ 장비 :  조향·제동 불량", case: "사례1: 악천후에 작업하다 시야 불량으로 전도", preSeverity: 3, preFrequency: 3, weight: 2 }, { id: 'machine_drive_11', description: "ⓐ 행동: 작업 중 휴대폰 사용, 한 손 운전\nⓔ 환경: 비·눈·강풍 시 작업\nⓢ 물질 :  윤활유·연료 누출\nⓜ 장비 :  조향·제동 불량", case: "사례2: 연료 주입 중 흡연으로 화재", preSeverity: 4, preFrequency: 2, weight: 3 }, { id: 'machine_drive_12', description: "ⓐ 행동: 작업 중 휴대폰 사용, 한 손 운전\nⓔ 환경: 비·눈·강풍 시 작업\nⓢ 물질 :  윤활유·연료 누출\nⓜ 장비 :  조향·제동 불량", case: "사례3: 주행 중 브레이크 고장으로 충돌", preSeverity: 4, preFrequency: 3, weight: 3 } ] }
+    ];
+    
+    // --- 2. 상태 관리 및 초기 실행 ---
+    
+    const state = {
+      basicInfo: { assessor: '', phone: '', region: '', workGroup: '' },
+      assessmentData: assessmentData,
+      rows: [],
+      currentEditingRowId: null,
+      tempSelectedRisk: null,
+    };
+    
+    document.addEventListener('DOMContentLoaded', () => {
+      loadState();
+      renderApp();
+    });
+    
+    // --- 3. 핵심 기능 함수 ---
+    
+    function createNewRow(id) {
+      return { id: id, task: '', subTask: '', selectedRisks: [], actualProblem: '', controls: '', isManualEntry: false, postSeverity: null, postFrequency: null, postWeight: null };
+    }
+    
+    function saveState() {
+      localStorage.setItem('riskAssessmentState', JSON.stringify({ basicInfo: state.basicInfo, rows: state.rows }));
+    }
+    
+    function loadState() {
+      const savedState = localStorage.getItem('riskAssessmentState');
+      if (savedState) {
+        const parsedState = JSON.parse(savedState);
+        state.basicInfo = parsedState.basicInfo || { assessor: '', phone: '', region: '', workGroup: '' };
+        state.rows = parsedState.rows || [];
+        state.rows.forEach(row => {
+          if (row.postSeverity === undefined) row.postSeverity = null;
+          if (row.postFrequency === undefined) row.postFrequency = null;
+          if (row.postWeight === undefined) row.postWeight = null;
+        });
+      } else {
+        state.rows = [createNewRow(1), createNewRow(2), createNewRow(3), createNewRow(4), createNewRow(5)];
+      }
+    }
+    
+    function resetState() {
+      if (confirm('정말로 모든 평가 내용을 초기화하시겠습니까? (기본 정보는 유지됩니다)')) {
+        const basicInfo = { ...state.basicInfo };
+        localStorage.removeItem('riskAssessmentState');
+        state.rows = [];
+        state.basicInfo = basicInfo;
+        loadState();
+        saveState();
+        renderApp();
+      }
+    }
+    
+    function getRiskLevel(score) {
+      if (score >= 15) return { level: '4. 허용 불가', colorClass: 'bg-red-200 text-red-900' };
+      if (score >= 8) return { level: '3. 상당한 위험', colorClass: 'bg-yellow-200 text-yellow-900' };
+      if (score >= 4) return { level: '2. 낮은 위험', colorClass: 'bg-green-200 text-green-900' };
+      if (score > 0) return { level: '1. 매우 낮음', colorClass: 'bg-blue-200 text-blue-900' };
+      return { level: '평가 전', colorClass: 'bg-gray-200 text-gray-800' };
+    }
+    
+   /** 전체 애플리케이션 화면을 다시 그립니다. */
+function renderApp() {
+  const appDiv = document.getElementById('app');
+  appDiv.innerHTML = `
+    <h1 class="text-4xl font-bold text-center mb-6 text-red-700">위험성 평가 프로그램</h1>
+    <p id="main-description" class="text-center text-lg text-gray-600 mb-8">
+      평가 대상이 되는 작업과 세부작업을 선택하고, 위험도를 평가해 보세요.
+    </p>
+    <div class="mb-4 flex flex-wrap justify-end space-x-2 no-print">
+      <button id="add-row-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">행 추가</button>
+      <button id="reset-button" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">초기화</button>
+      <button id="print-button" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg">보고서 생성</button>
+      <button id="csv-export-button" class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg">CSV 저장</button>
+    </div>
+    ${renderBasicInfo()}
+    <div class="mb-8">${renderMainTable()}</div>
+    <div id="details-table-section" class="mt-8">${renderDetailsTable()}</div>
+    <div id="guidance-section" class="mt-8">${renderGuidanceTable()}</div>
+    <div id="post-assessment-section" class="mt-8">${renderPostAssessmentTable()}</div>
+    <div id="summary-section" class="mt-8">${renderSummary()}</div>
+  `;
+  attachEventListeners();
+}
+    
+    function renderBasicInfo() {
+      return `
+        <div class="bg-gray-100 p-6 rounded-xl shadow-inner border border-gray-200 mb-8 no-print">
+            <h2 class="text-2xl font-bold text-gray-700 mb-4">기본 정보</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div><label class="block text-sm font-bold mb-2">평가자명</label><input type="text" class="basic-info-input w-full p-2 border rounded-lg" data-field="assessor" value="${state.basicInfo.assessor}"></div>
+                <div><label class="block text-sm font-bold mb-2">전화번호</label><input type="text" class="basic-info-input w-full p-2 border rounded-lg" data-field="phone" value="${state.basicInfo.phone}"></div>
+                <div><label class="block text-sm font-bold mb-2">지역명</label><input type="text" class="basic-info-input w-full p-2 border rounded-lg" data-field="region" value="${state.basicInfo.region}"></div>
+                <div><label class="block text-sm font-bold mb-2">작목반</label><input type="text" class="basic-info-input w-full p-2 border rounded-lg" data-field="workGroup" value="${state.basicInfo.workGroup}"></div>
+            </div>
+        </div>
+      `;
+    }
+    
+    function renderMainTable() {
+      const tasks = [...new Set(state.assessmentData.map(item => item.task))];
+      const tableRows = state.rows.map(row => {
+        const subTasks = row.task ? [...new Set(state.assessmentData.filter(item => item.task === row.task).map(item => item.subTask))] : [];
+        let totalScore = '', severityDisplay = '', frequencyDisplay = '', weightDisplay = '';
+        if (row.selectedRisks.length > 0) {
+          const risk = row.selectedRisks[0];
+          totalScore = (risk.preSeverity * risk.preFrequency) + risk.weight;
+          severityDisplay = risk.preSeverity; frequencyDisplay = risk.preFrequency; weightDisplay = risk.weight;
+        }
+        const isRiskSelectable = !row.isManualEntry && row.task && row.subTask;
+        const riskButton = row.isManualEntry ?
+          `<button class="edit-manual-button bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-full" data-row-id="${row.id}">수정</button>` :
+          `<button class="select-risk-button bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-full ${isRiskSelectable ? '' : 'opacity-50 cursor-not-allowed'}" data-row-id="${row.id}" ${isRiskSelectable ? '' : 'disabled'}>위험 선택</button>`;
+        const taskInputOrSelect = row.isManualEntry ?
+          `<span class="w-full block p-2 bg-yellow-50">${row.task || ''}</span>` :
+          `<select class="task-select w-full p-2 border rounded-lg" data-row-id="${row.id}"><option value="">작업 선택</option>${tasks.map(t => `<option value="${t}" ${row.task === t ? 'selected' : ''}>${t}</option>`).join('')}<option value="직접 입력">직접 입력</option></select>`;
+        const subTaskInputOrSelect = row.isManualEntry ?
+          `<span class="w-full block p-2 bg-yellow-50">${row.subTask || ''}</span>` :
+          `<select class="subtask-select w-full p-2 border rounded-lg" data-row-id="${row.id}" ${!row.task ? 'disabled' : ''}><option value="">세부작업 선택</option>${subTasks.map(st => `<option value="${st}" ${row.subTask === st ? 'selected' : ''}>${st}</option>`).join('')}</select>`;
+        return `<tr class="hover:bg-red-50 group"><td class="p-4 border-b text-center">${row.id}</td><td class="p-4 border-b">${taskInputOrSelect}</td><td class="p-4 border-b">${subTaskInputOrSelect}</td><td class="p-4 border-b text-center">${severityDisplay}</td><td class="p-4 border-b text-center">${frequencyDisplay}</td><td class="p-4 border-b text-center">${weightDisplay}</td><td class="p-4 border-b text-center font-bold text-red-600">${totalScore}</td><td class="p-4 border-b text-center no-print">${riskButton}</td><td class="p-4 border-b text-center no-print"><button class="delete-row-button text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100" data-row-id="${row.id}"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button></td></tr>`;
+      }).join('');
+      return `<div class="bg-gray-100 p-6 rounded-xl"><h2 class="text-2xl font-bold text-red-700 mb-4">1. 위험성 평가 실행</h2><table class="min-w-full"><thead><tr class="bg-gray-200 text-gray-700 uppercase text-sm"><th class="py-3 px-4 text-center">번호</th><th class="py-3 px-4 text-left">작업</th><th class="py-3 px-4 text-left">세부작업</th><th class="py-3 px-4 text-center">강도</th><th class="py-3 px-4 text-center">빈도</th><th class="py-3 px-4 text-center">가중치</th><th class="py-3 px-4 text-center">개선 전<br>위험도</th><th class="py-3 px-4 text-center no-print">평가</th><th class="py-3 px-4 text-center no-print">삭제</th></tr></thead><tbody class="text-sm">${tableRows}</tbody></table></div>`;
+    }
+    
+    function renderDetailsTable() {
+      const assessedRows = state.rows.filter(row => {
+        if (!row.task || !row.subTask) return false;
+        const riskData = row.selectedRisks?.[0];
+        if (!riskData) return false;
+        if (row.isManualEntry) return true;
+        return (riskData.preSeverity * riskData.preFrequency) + riskData.weight > 0;
+      });
+      if (assessedRows.length === 0) return '';
+      const tableRows = assessedRows.map(row => {
+        const risk = row.selectedRisks[0];
+        const score = (risk.preSeverity * risk.preFrequency) + risk.weight;
+        const { level, colorClass } = getRiskLevel(score);
+        return `<tr class="hover:bg-red-50"><td class="py-3 px-4 text-center border-b">${row.id}</td><td class="py-3 px-4 border-b">${row.task}</td><td class="py-3 px-4 border-b">${row.subTask}</td><td class="py-3 px-4 border-b">${row.actualProblem}</td><td class="py-3 px-4 text-center border-b font-bold ${colorClass}">${level}</td><td class="py-3 px-4 text-center border-b font-bold text-red-600">${score}</td></tr>`;
+      }).join('');
+      return `<div class="bg-gray-100 p-6 rounded-xl"><h2 class="text-2xl font-bold text-red-700 mb-4">2. 개선 전 평가 결과 요약</h2><table class="min-w-full"><thead><tr class="bg-gray-200 text-gray-700 uppercase text-sm"><th class="py-3 px-4 text-center">번호</th><th class="py-3 px-4 text-left">작업</th><th class="py-3 px-4 text-left">세부작업</th><th class="py-3 px-4 text-left" style="width: 40%;">실제 문제점</th><th class="py-3 px-4 text-center">위험등급</th><th class="py-3 px-4 text-center">개선 전 위험도</th></tr></thead><tbody class="text-sm">${tableRows}</tbody></table></div>`;
+    }
+    
+    function renderGuidanceTable() {
+      return `<div class="bg-gray-100 p-6 rounded-xl no-print"><details><summary class="text-xl font-bold cursor-pointer">개선 후 위험도 점수 참고표 (클릭하여 열기)</summary><table class="min-w-full mt-4 text-sm"><thead class="bg-gray-200"><tr><th class="p-2">점수</th><th class="p-2">판단 기준</th><th class="p-2">예시</th></tr></thead><tbody class="bg-white"><tr><td class="p-2 font-bold">1점</td><td class="p-2">위험 요소 제거됨, 작업환경 매우 안정적</td><td class="p-2">자동화 도입, 위험요소 제거 완료</td></tr><tr><td class="p-2 font-bold">2점</td><td class="p-2">위험 요소 없음 또는 미미, 보호구 없이도 안전</td><td class="p-2">단순 반복작업, 보호구 착용으로 완전 차단 가능</td></tr><tr><td class="p-2 font-bold">3점</td><td class="p-2">위험요소는 존재하나 일상적 관리만으로 통제 가능</td><td class="p-2">정비된 장비 사용, 보호구 착용 시 무해</td></tr><tr><td class="p-2 font-bold">4점</td><td class="p-2">위험 요소가 단발적이거나 계절적이나 예측 가능</td><td class="p-2">온열작업이나 농약 사용이 제한적일 경우</td></tr><tr><td class="p-2 font-bold">5점</td><td class="p-2">개선되었으나 보호구 미착용 시 위험 있음</td><td class="p-2">방진마스크, 장갑 등 필수 보호구 착용 전제</td></tr></tbody></table></details></div>`;
+    }
+    
+    function renderPostAssessmentTable() {
+      const assessedRows = state.rows.filter(row => row.task && row.subTask && row.selectedRisks?.[0]);
+      if (assessedRows.length === 0) return '';
+      const tableRows = assessedRows.map(row => {
+        const preRisk = row.selectedRisks[0];
+        const preScore = (preRisk.preSeverity * preRisk.preFrequency) + preRisk.weight;
+        const postSeverity = row.postSeverity || 0, postFrequency = row.postFrequency || 0, postWeight = row.postWeight || 0;
+        const postScore = (postSeverity * postFrequency) + postWeight;
+        const reductionRate = preScore > 0 ? (((preScore - postScore) / preScore) * 100).toFixed(2) + '%' : '0.00%';
+        const { level: postLevel, colorClass: postColorClass } = getRiskLevel(postScore);
+        return `<tr class="hover:bg-blue-50"><td class="py-3 px-4 text-center border-b">${row.id}</td><td class="py-3 px-4 border-b"><textarea class="post-assessment-input w-full p-1 border rounded" data-row-id="${row.id}" data-field="controls" placeholder="안전 대책">${row.controls || ''}</textarea></td><td class="py-3 px-4 text-center border-b"><input type="number" min="1" max="4" value="${row.postSeverity || ''}" class="post-assessment-input w-16 p-1 text-center border rounded" data-row-id="${row.id}" data-field="postSeverity"></td><td class="py-3 px-4 text-center border-b"><input type="number" min="1" max="5" value="${row.postFrequency || ''}" class="post-assessment-input w-16 p-1 text-center border rounded" data-row-id="${row.id}" data-field="postFrequency"></td><td class="py-3 px-4 text-center border-b"><input type="number" min="0" max="4" value="${row.postWeight === null ? '' : row.postWeight}" class="post-assessment-input w-16 p-1 text-center border rounded" data-row-id="${row.id}" data-field="postWeight"></td><td id="post-score-${row.id}" class="py-3 px-4 text-center border-b font-bold text-blue-600">${postScore}</td><td id="post-level-${row.id}" class="py-3 px-4 text-center border-b font-bold ${postColorClass}">${postLevel}</td><td id="reduction-rate-${row.id}" class="py-3 px-4 text-center border-b font-bold text-green-600">${reductionRate}</td></tr>`;
+      }).join('');
+      return `<div class="bg-gray-100 p-6 rounded-xl"><div class="flex justify-between items-center"><h2 class="text-2xl font-bold text-blue-700 mb-4">3. 개선 후 위험성 평가 및 감소율</h2><button id="update-all-button" class="bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 no-print mb-4">종합 요약에 반영</button></div><table class="min-w-full"><thead><tr class="bg-gray-200 text-gray-700 uppercase text-sm"><th class="py-3 px-4 text-center">번호</th><th class="py-3 px-4 text-left" style="width: 30%;">대책</th><th class="py-3 px-4 text-center">개선 후<br>강도</th><th class="py-3 px-4 text-center">개선 후<br>빈도</th><th class="py-3 px-4 text-center">개선 후<br>가중치</th><th class="py-3 px-4 text-center">개선 후<br>위험도</th><th class="py-3 px-4 text-center">개선 후<br>위험등급</th><th class="py-3 px-4 text-center">위험성<br>감소율</th></tr></thead><tbody class="text-sm">${tableRows}</tbody></table></div>`;
+    }
+    
+/** 4번 '종합 평가 요약' 섹션의 HTML을 생성합니다. (상하 구조로 변경) */
+function renderSummary() {
+  const assessedRows = state.rows.filter(row => row.task && row.subTask && row.selectedRisks?.[0]);
+  const totalRisks = assessedRows.length;
+  const totalPreScore = assessedRows.reduce((sum, row) => sum + (row.selectedRisks[0].preSeverity * row.selectedRisks[0].preFrequency) + row.selectedRisks[0].weight, 0);
+  const totalPostScore = assessedRows.reduce((sum, row) => sum + ((row.postSeverity || 0) * (row.postFrequency || 0)) + (row.postWeight || 0), 0);
+  const averageReductionRate = totalPreScore > 0 ? (((totalPreScore - totalPostScore) / totalPreScore) * 100).toFixed(2) : "0.00";
+
+  // 그래프 높이 계산 기준을 '개선 전 총점'으로 변경
+  const maxBarHeightReference = totalPreScore > 0 ? totalPreScore : 1;
+  const preBarHeight = (totalPreScore / maxBarHeightReference) * 100;
+  const postBarHeight = (totalPostScore / maxBarHeightReference) * 100;
+
+  return `
+    <div class="bg-red-50 p-8 rounded-2xl shadow-xl">
+      <h2 class="text-2xl font-bold text-red-800 mb-6 text-center">4. 종합 평가 요약</h2>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="p-4 bg-white rounded-lg shadow-inner text-center">
+            <p class="font-semibold text-gray-700">총 평가 항목</p>
+            <p id="summary-total-risks" class="text-4xl font-extrabold text-red-600">${totalRisks}</p>
+        </div>
+        <div class="p-4 bg-white rounded-lg shadow-inner text-center">
+            <p class="font-semibold text-gray-700">개선 전 총 위험도</p>
+            <p id="summary-total-pre-score" class="text-4xl font-extrabold text-red-600">${totalPreScore}</p>
+        </div>
+        <div class="p-4 bg-white rounded-lg shadow-inner text-center">
+            <p class="font-semibold text-gray-700">개선 후 총 위험도</p>
+            <p id="summary-total-post-score" class="text-4xl font-extrabold text-blue-600">${totalPostScore}</p>
+        </div>
+        <div class="p-4 bg-green-100 rounded-lg shadow-inner text-center">
+            <p class="font-semibold text-gray-700">총 위험성 감소율</p>
+            <p id="summary-reduction-rate" class="text-5xl font-extrabold text-green-600">${averageReductionRate}%</p>
+        </div>
+      </div>
+      
+      <div class="p-4 bg-white rounded-lg shadow-inner">
+        <p class="font-semibold text-center mb-4">위험도 총점 비교</p>
+        <div class="chart-container">
+            <div class="bar-wrapper">
+                <div id="pre-score-bar" class="bar pre-bar" style="height: ${preBarHeight}%"><span id="pre-score-bar-text">${totalPreScore}</span></div>
+                <span class="bar-label">개선 전</span>
+            </div>
+            <div class="bar-wrapper">
+                <div id="post-score-bar" class="bar post-bar" style="height: ${postBarHeight}%"><span id="post-score-bar-text">${totalPostScore}</span></div>
+                <span class="bar-label">개선 후</span>
+            </div>
+        </div>
+      </div>
+    </div>
+  `;
+} 
+    function renderModal(rowId) {
+        const modal = document.getElementById('assessment-modal');
+        const modalContent = modal.querySelector('.modal-content');
+        const row = state.rows.find(r => r.id === rowId);
+        const risksForSubTask = state.assessmentData.find(d => d.task === row.task && d.subTask === row.subTask)?.risks || [];
+        state.tempSelectedRisk = null;
+        modalContent.innerHTML = `<div class="flex justify-between items-center mb-4"><h2 class="text-2xl font-bold text-red-700">${row.task} > ${row.subTask}</h2><button id="close-modal-button" class="text-3xl">&times;</button></div><div class="modal-content-scroll pr-4"><div class="grid grid-cols-1 md:grid-cols-2 gap-6"><div><h3 class="font-bold text-lg mb-2">1. 발생 가능한 위험 사례 선택</h3><div class="space-y-2">${risksForSubTask.map(risk => `<div class="case-item p-3 border rounded-lg" data-risk-id="${risk.id}"><p class="font-semibold">${risk.case}</p></div>`).join('')}</div></div><div id="selected-risk-details" class="bg-red-50 p-4 rounded-lg" style="display: none;"></div></div></div><div class="mt-6 flex justify-end"><button id="close-and-save-button" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg">선택 완료</button></div>`;
+        modal.style.display = 'flex';
+        attachModalEventListeners();
+    }
+    
+    function renderRiskDetails(risk) {
+        if (!risk) return '';
+        const totalScore = (risk.preSeverity * risk.preFrequency) + risk.weight;
+        return `<h3 class="font-bold text-lg mb-3">2. 위험 상세 정보 및 수정</h3><div class="text-sm space-y-3 p-3 bg-white rounded"><div><p class="font-bold mb-1">실제 문제점 (수정 가능):</p><textarea id="modal-actual-problem" class="w-full p-2 border rounded-lg" rows="4">${risk.case}</textarea></div><hr class="my-2"><p><strong>주요 요인:</strong></p><p class="whitespace-pre-wrap">${risk.description}</p><p><strong>기본 강도:</strong> <span class="font-bold text-red-600">${risk.preSeverity}</span></p><p><strong>기본 빈도:</strong> <span class="font-bold text-red-600">${risk.preFrequency}</span></p><div class="flex items-center space-x-2"><label for="modal-weight" class="font-bold">가중치 조정 (0-4):</label><input type="number" id="modal-weight" min="0" max="4" value="${risk.weight}" class="w-20 p-1 border text-center rounded"></div><hr class="my-2"><p class="text-lg font-bold"><strong>개선 전 위험도:</strong> <span id="risk-score" class="text-red-700">${totalScore}</span></p></div>`;
+    }
+    
+    function renderManualInputModal(rowId) {
+        const modal = document.getElementById('assessment-modal');
+        const modalContent = modal.querySelector('.modal-content');
+        const row = state.rows.find(r => r.id === rowId);
+        const existingRisk = row.selectedRisks[0] || {};
+        const totalScore = (existingRisk.preSeverity || 0) * (existingRisk.preFrequency || 0) + (existingRisk.weight || 0);
+        modalContent.innerHTML = `<div class="flex justify-between items-center mb-4"><h2 class="text-2xl font-bold text-yellow-700">위험 정보 직접 입력 (행: ${rowId})</h2><button id="close-manual-modal-button" class="text-3xl">&times;</button></div><div class="space-y-4"><div><label class="font-bold">작업</label><input type="text" id="manual-task" class="w-full p-2 border rounded" value="${row.task || ''}" placeholder="예: 방제"></div><div><label class="font-bold">세부작업</label><input type="text" id="manual-subtask" class="w-full p-2 border rounded" value="${row.subTask || ''}" placeholder="예: 농약 살포"></div><div><label class="font-bold">실제 문제점</label><textarea id="manual-actual-problem" class="w-full p-2 border rounded" rows="3">${row.actualProblem || ''}</textarea></div><div class="grid grid-cols-3 gap-4"><div><label class="font-bold">강도 (1-4)</label><input type="number" id="manual-severity" min="1" max="4" class="w-full p-2 border rounded" value="${existingRisk.preSeverity || ''}"></div><div><label class="font-bold">빈도 (1-5)</label><input type="number" id="manual-frequency" min="1" max="5" class="w-full p-2 border rounded" value="${existingRisk.preFrequency || ''}"></div><div><label class="font-bold">가중치 (0-4)</label><input type="number" id="manual-weight" min="0" max="4" class="w-full p-2 border rounded" value="${existingRisk.weight || ''}"></div></div><p class="text-lg font-bold text-right"><strong>개선 전 위험도:</strong> <span id="manual-total-score" class="text-red-700">${totalScore}</span></p></div><div class="mt-6 flex justify-end"><button id="save-manual-input-button" class="bg-yellow-500 hover:bg-yellow-600 text-white py-2 px-6 rounded-lg">저장</button></div>`;
+        modal.style.display = 'flex';
+        attachManualModalEventListeners(rowId);
+    }
+    
+/** 모든 버튼과 입력창에 이벤트 리스너를 부착합니다. */
+function attachEventListeners() {
+    document.getElementById('add-row-button').addEventListener('click', () => {
+        const newId = state.rows.length > 0 ? Math.max(...state.rows.map(r => r.id)) + 1 : 1;
+        state.rows.push(createNewRow(newId));
+        renderApp();
+        saveState();
+    });
+    document.querySelectorAll('.delete-row-button').forEach(b => b.addEventListener('click', e => {
+        const rowId = parseInt(e.currentTarget.dataset.rowId);
+        if (confirm(`정말로 ${rowId}번 항목을 삭제하시겠습니까?`)) {
+            state.rows = state.rows.filter(r => r.id !== rowId);
+            renderApp();
+            saveState();
+        }
+    }));
+    document.getElementById('reset-button').addEventListener('click', resetState);
+    document.getElementById('csv-export-button').addEventListener('click', exportToCSV);
+    document.querySelectorAll('.basic-info-input').forEach(i => i.addEventListener('input', e => {
+        state.basicInfo[e.target.dataset.field] = e.target.value;
+        saveState();
+    }));
+    document.querySelectorAll('.task-select, .subtask-select, .select-risk-button, .edit-manual-button').forEach(el => {
+        const handler = (e) => {
+            const rowId = parseInt(e.currentTarget.dataset.rowId);
+            const row = state.rows.find(r => r.id === rowId);
+            if (!row) return;
+            if (e.currentTarget.classList.contains('task-select')) {
+                const selectedTask = e.currentTarget.value;
+                if (selectedTask === '직접 입력') {
+                    row.isManualEntry = true; row.task = ''; row.subTask = ''; row.selectedRisks = []; row.actualProblem = '';
+                    state.currentEditingRowId = rowId;
+                    renderManualInputModal(rowId);
+                } else {
+                    row.isManualEntry = false; row.task = selectedTask; row.subTask = ''; row.selectedRisks = [];
+                    renderApp();
+                    saveState();
+                }
+            } else if (e.currentTarget.classList.contains('subtask-select')) {
+                row.subTask = e.currentTarget.value; row.selectedRisks = [];
+                renderApp();
+                saveState();
+            } else if (e.currentTarget.classList.contains('select-risk-button') || e.currentTarget.classList.contains('edit-manual-button')) {
+                state.currentEditingRowId = rowId;
+                if (row.isManualEntry) renderManualInputModal(rowId);
+                else renderModal(rowId);
+            }
+        };
+        if (el.tagName === 'SELECT') el.addEventListener('change', handler);
+        else el.addEventListener('click', handler);
+    });
+    
+    document.querySelectorAll('.post-assessment-input').forEach(i => i.addEventListener('input', e => {
+        const rowId = parseInt(e.target.dataset.rowId), field = e.target.dataset.field;
+        const row = state.rows.find(r => r.id === rowId);
+        if (row) {
+            row[field] = e.target.value === '' ? null : (field === 'controls' ? e.target.value : parseInt(e.target.value, 10));
+            saveState();
+            
+            const summarySection = document.getElementById('summary-section');
+            if (summarySection) {
+                summarySection.innerHTML = renderSummary();
+            }
+        }
+    }));
+
+    document.getElementById('update-all-button')?.addEventListener('click', () => {
+        renderApp();
+        alert('종합 평가 요약에 반영되었습니다.');
+    });
+
+    document.getElementById('print-button')?.addEventListener('click', () => {
+        const appTitle = document.querySelector('#app > h1');
+        if (!appTitle) {
+            alert('보고서 제목을 찾을 수 없어 인쇄할 수 없습니다.');
+            return;
+        }
+        const originalTitleHTML = appTitle.innerHTML;
+        const today = new Date();
+        const dateString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        
+        const reportHeader = `
+            <div class="text-3xl font-bold text-center mb-4">위험성 평가 결과 보고서</div>
+            <table class="w-full border-collapse border border-gray-400 mb-4 text-base">
+                <tr>
+                    <td class="border p-2 font-bold text-center bg-gray-100">작목반</td>
+                    <td class="border p-2">${state.basicInfo.workGroup || ''}</td>
+                    <td class="border p-2 font-bold text-center bg-gray-100">지역명</td>
+                    <td class="border p-2">${state.basicInfo.region || ''}</td>
+                </tr>
+                <tr>
+                    <td class="border p-2 font-bold text-center bg-gray-100">평가자</td>
+                    <td class="border p-2">${state.basicInfo.assessor || ''}</td>
+                    <td class="border p-2 font-bold text-center bg-gray-100">평가일</td>
+                    <td class="border p-2">${dateString}</td>
+                </tr>
+            </table>
+        `;
+        appTitle.innerHTML = reportHeader;
+        
+        const styleId = 'print-style';
+        let style = document.getElementById(styleId);
+        if (!style) {
+            style = document.createElement('style');
+            style.id = styleId;
+            document.head.appendChild(style);
+        }
+        
+        style.innerHTML = `
+            @media print {
+                body { 
+                    font-family: 'Malgun Gothic', sans-serif; 
+                    -webkit-print-color-adjust: exact !important;
+                    color-adjust: exact !important;
+                }
+                .no-print { display: none !important; }
+                #app { box-shadow: none !important; padding: 0 !important; }
+                #main-description { display: none !important; } /* 설명 문구만 정확히 숨김 */
+                h1, h2 { text-align: center; }
+                h2 { border-bottom: 2px solid #333; padding-bottom: 0.5rem; margin-top: 2rem; }
+                table { width: 100%; border-collapse: collapse; font-size: 10pt; }
+                th, td { border: 1px solid #ccc; padding: 8px; text-align: center; word-break: break-all; }
+                thead th { background-color: #f2f2f2 !important; }
+                /* 요약 섹션 글자 색상 및 크기 강제 지정 */
+                #summary-section p { color: black !important; font-size: 12pt !important; }
+                #summary-section .text-4xl, #summary-section .text-5xl { font-size: 24pt !important; }
+                .bg-red-200, .bg-yellow-200, .bg-green-200, .bg-blue-200 { -webkit-print-color-adjust: exact; color-adjust: exact; }
+                .print-only-text { display: none; }
+                select, input, textarea { border: none !important; font-size: 10pt; font-family: 'Malgun Gothic', sans-serif; width: 100%; text-align: center; }
+                textarea { text-align: left; }
+                .task-select, .subtask-select { display: none; }
+                .task-select + .print-only-text, .subtask-select + .print-only-text { display: inline !important; }
+            }
+        `;
+        
+        document.querySelectorAll('.task-select, .subtask-select').forEach(select => {
+            let textSpan = select.nextElementSibling;
+            if (!textSpan || !textSpan.classList.contains('print-only-text')) {
+                textSpan = document.createElement('span');
+                textSpan.className = 'print-only-text';
+                select.parentNode.appendChild(textSpan);
+            }
+            textSpan.textContent = select.options[select.selectedIndex].text;
+        });
+
+        window.print();
+
+        appTitle.innerHTML = originalTitleHTML;
+    });
+}  
+
+function attachModalEventListeners() {
+        const modal = document.getElementById('assessment-modal');
+        modal.querySelector('#close-modal-button')?.addEventListener('click', () => modal.style.display = 'none');
+        modal.querySelector('#close-and-save-button')?.addEventListener('click', () => {
+            const row = state.rows.find(r => r.id === state.currentEditingRowId);
+            if (row && state.tempSelectedRisk) {
+                row.actualProblem = document.getElementById('modal-actual-problem').value;
+                row.selectedRisks = [{ ...state.tempSelectedRisk }];
+            }
+            modal.style.display = 'none';
+            renderApp();
+            saveState();
+        });
+        modal.querySelectorAll('.case-item').forEach(item => item.addEventListener('click', e => {
+            modal.querySelectorAll('.case-item').forEach(el => el.classList.remove('selected'));
+            e.currentTarget.classList.add('selected');
+            const riskId = e.currentTarget.dataset.riskId;
+            const row = state.rows.find(r => r.id === state.currentEditingRowId);
+            const risks = state.assessmentData.find(d => d.task === row.task && d.subTask === row.subTask).risks;
+            state.tempSelectedRisk = { ...risks.find(r => r.id === riskId) };
+            const detailsDiv = document.getElementById('selected-risk-details');
+            detailsDiv.innerHTML = renderRiskDetails(state.tempSelectedRisk);
+            detailsDiv.style.display = 'block';
+            document.getElementById('modal-weight').addEventListener('input', ev => {
+                if (state.tempSelectedRisk) {
+                    state.tempSelectedRisk.weight = parseInt(ev.target.value) || 0;
+                    document.getElementById('risk-score').textContent = (state.tempSelectedRisk.preSeverity * state.tempSelectedRisk.preFrequency) + state.tempSelectedRisk.weight;
+                }
+            });
+        }));
+    }
+    
+    function attachManualModalEventListeners(rowId) {
+        const modal = document.getElementById('assessment-modal');
+        modal.querySelector('#close-manual-modal-button').addEventListener('click', () => {
+            const row = state.rows.find(r => r.id === rowId);
+            if (row && !row.task) row.isManualEntry = false;
+            modal.style.display = 'none';
+            renderApp();
+        });
+        modal.querySelector('#save-manual-input-button').addEventListener('click', () => {
+            const row = state.rows.find(r => r.id === rowId);
+            const task = document.getElementById('manual-task').value, subtask = document.getElementById('manual-subtask').value;
+            if (!task || !subtask) return alert('작업과 세부작업은 반드시 입력해야 합니다.');
+            row.task = task;
+            row.subTask = subtask;
+            row.actualProblem = document.getElementById('manual-actual-problem').value || "직접 입력한 위험";
+            row.selectedRisks = [{
+                id: `manual_${rowId}`,
+                preSeverity: parseInt(document.getElementById('manual-severity').value) || 0,
+                preFrequency: parseInt(document.getElementById('manual-frequency').value) || 0,
+                weight: parseInt(document.getElementById('manual-weight').value) || 0,
+            }];
+            row.isManualEntry = true;
+            modal.style.display = 'none';
+            renderApp();
+            saveState();
+        });
+        modal.querySelectorAll('input[type="number"]').forEach(i => i.addEventListener('input', () => {
+            const s = parseInt(document.getElementById('manual-severity').value) || 0, f = parseInt(document.getElementById('manual-frequency').value) || 0, w = parseInt(document.getElementById('manual-weight').value) || 0;
+            document.getElementById('manual-total-score').textContent = (s * f) + w;
+        }));
+    }
+    
+    function exportToCSV() {
+        const assessedRows = state.rows.filter(row => row.task && row.subTask && row.selectedRisks.length > 0);
+        if (assessedRows.length === 0) return alert("내보낼 데이터가 없습니다.");
+        let csvContent = "\uFEFF";
+        csvContent += "평가 기본 정보\r\n";
+        csvContent += `평가자명,${state.basicInfo.assessor}\r\n\r\n`;
+        csvContent += "평가 상세 결과\r\n";
+        const headers = ["번호", "작업", "세부작업", "실제 문제점", "개선 전 강도", "개선 전 빈도", "개선 전 가중치", "개선 전 위험도", "개선 전 위험등급", "대책", "개선 후 강도", "개선 후 빈도", "개선 후 가중치", "개선 후 위험도", "개선 후 위험등급", "위험성 감소율(%)"];
+        csvContent += headers.join(',') + '\r\n';
+        assessedRows.forEach(row => {
+            const preRisk = row.selectedRisks[0];
+            const preScore = (preRisk.preSeverity * preRisk.preFrequency) + preRisk.weight;
+            const postScore = (row.postSeverity || 0) * (row.postFrequency || 0) + (row.postWeight || 0);
+            const reductionRate = preScore > 0 ? (((preScore - postScore) / preScore) * 100).toFixed(2) : 0;
+            const escape = (str) => `"${String(str || '').replace(/"/g, '""')}"`;
+            const csvRow = [row.id, escape(row.task), escape(row.subTask), escape(row.actualProblem), preRisk.preSeverity, preRisk.preFrequency, preRisk.weight, preScore, escape(getRiskLevel(preScore).level), escape(row.controls), row.postSeverity || 0, row.postFrequency || 0, row.postWeight || 0, postScore, escape(getRiskLevel(postScore).level), reductionRate].join(',');
+            csvContent += csvRow + '\r\n';
+        });
+        const link = document.createElement("a");
+        link.setAttribute("href", URL.createObjectURL(new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })));
+        link.setAttribute("download", `위험성평가_보고서_${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+    </script>
+
+</body>
+</html>

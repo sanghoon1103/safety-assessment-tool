@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>안전관리 수준 평가 프로그램</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap');
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      background-color: #f3f4f6;
+    }
+    .chart-container {
+      width: 100%;
+      height: 384px; /* h-96 */
+    }
+    .report-table th, .report-table td {
+      border: 1px solid #e5e7eb;
+      padding: 0.75rem;
+      text-align: left;
+    }
+    .report-table th {
+      background-color: #f9fafb;
+      font-weight: bold;
+    }
+    @media print {
+      body {
+        font-family: 'Noto Sans KR', sans-serif;
+        background-color: white;
+      }
+      .no-print {
+        display: none;
+      }
+      .report-table th, .report-table td {
+        border: 1px solid #d1d5db;
+        padding: 0.5rem;
+      }
+      .report-table h3 {
+        font-size: 1.25rem;
+        margin-top: 1rem;
+        margin-bottom: 0.5rem;
+      }
+    }
+  </style>
+</head>
+<body class="p-8">
+  <div id="app"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <script>
+    // 전체 애플리케이션 상태를 관리하는 객체
+    let appState = {
+      basicInfo: {
+        evaluatorName: '',
+        phoneNumber: '',
+        region: '',
+        cropGroup: '',
+      },
+      currentGrades: {},
+      targetGrades: {},
+      descriptions: {},
+      selectedItemId: null,
+      evaluationData: [
+        {
+          mainComponent: '농작업',
+          mainScore: 180,
+          subComponents: [
+            {
+              subComponent: '작업자세',
+              subScore: 180,
+              indicators: [
+                {
+                  title: '작업 자세 개선을 위한 작업 자세의 조합, 작업교대 및 휴식, 자세 보조구 사용 등의 적절성',
+                  id: 'work_posture',
+                  maxScore: 100,
+                  grades: [
+                    { grade: 'A', score: 100, criteria: '작업부담이 없는 교대체계가 마련되어 있음. 휴식 시간 확보 및 간단한 스트레칭·체조 등 관리지침이 실행되고 있음. 자세 보조장비(작업대, 착좌대, 팔걸이 등)가 적절히 설치되어 실제로 활용됨.' },
+                    { grade: 'B', score: 80, criteria: '일부 반복 자세가 존재하나 작업시간 내 적절한 교대 및 휴식 확보. 보조도구는 설치되어 있으나 일부 작업에서만 사용되며, 전반적인 피로 누적은 낮은 수준.' },
+                    { grade: 'C', score: 60, criteria: '고정된 작업자세가 일정시간 지속되며, 작업 중간의 휴식 또는 체조·관리 교육 등으로 피로를 일부 완화. 보조수단은 있으나 적극적 사용은 미흡. 작업자의 피로도는 존재하나 위험은 관리 가능 수준.' },
+                    { grade: 'D', score: 40, criteria: '장시간 고정 자세 지속, 휴식·교대가 미흡함. 보조수단이 있으나 잘못된 사용 혹은 인식 부족으로 미사용됨. 피로도 누적이 높고, 근골격계 질환 위험 증가.' },
+                    { grade: 'E', score: 20, criteria: '매우 불편한 자세 또는 신체 부담이 심한 작업자세가 장시간 지속되며, 휴식 시간이나 교대가 전혀 없음. 보조수단 부재 또는 잘못된 사용으로 인해 심각한 건강위험이 있음.' },
+                  ],
+                },
+                {
+                  title: '작업영역, 재료·공구의 배치, 작업대 높이 등 워크스테이션 설계의 적절성',
+                  id: 'workstation_design',
+                  maxScore: 80,
+                  grades: [
+                    { grade: 'A', score: 80, criteria: '충분한 작업공간과 짧은 동선 확보. 도구·자재는 손 닿는 위치에 정리되어 있으며, 작업대는 신체조건에 맞게 높낮이 조절 가능. 전체 설계가 인체공학적으로 정비되어 있어 작업피로 및 사고위험 최소화.' },
+                    { grade: 'B', score: 64, criteria: '작업영역 정비가 비교적 양호, 대부분 도구가 가까이에 배치되어 있음. 작업대는 고정형이나 인체에 큰 무리는 없음. 환경은 정돈된 편이며, 사용자가 일부 정비·배치를 조정하며 작업.' },
+                    { grade: 'C', score: 48, criteria: '작업공간이 좁거나 비효율적인 배치가 존재하나, 작업자가 스스로 적응하며 수행 중. 작업대 높이가 신체조건과 일부 불일치. 반복적 불편함은 존재하나 위험 수준은 아님.' },
+                    { grade: 'D', score: 32, criteria: '공구 및 자재 배치가 무질서하거나, 작업 동선이 길고 비효율적임. 작업대 높이가 지나치게 높거나 낮아 신체 부담 유발. 위험요소가 잠재적으로 존재.' },
+                    { grade: 'E', score: 16, criteria: '도구와 자재가 어지럽게 흩어져 있거나, 접근이 어렵고, 작업대가 위험하거나 정비되지 않음. 작업자세가 왜곡되고, 사고위험이 높은 상태. 개선이 시급함.' },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        {
+          mainComponent: '농기계 및 기구',
+          mainScore: 240,
+          subComponents: [
+            {
+              subComponent: '농작업 보조도구',
+              subScore: 120,
+              indicators: [
+                {
+                  title: '동력공구의 안전장치 및 작업물 고정장치 등의 보조장치 설치의 적절성',
+                  id: 'tool_safety',
+                  maxScore: 50,
+                  grades: [
+                    { grade: 'A', score: 50, criteria: '안전장치(예: 방호커버, 급정지장치 등) 및 고정장치가 완비되어 있고, 작동 상태 양호하며, 작업자가 적절히 사용하고 있음.' },
+                    { grade: 'B', score: 40, criteria: '대부분의 안전장치가 설치되어 있고 기본적인 작동은 가능하나, 일부 장치의 부착 또는 상태가 미흡함. 작업자 사용 실천 양호.' },
+                    { grade: 'C', score: 30, criteria: '최소한의 안전장치가 설치되어 있으며, 사용 전 점검·교육 등을 통해 안전을 일정 수준 확보함. 실천 노력 존재.' },
+                    { grade: 'D', score: 20, criteria: '안전장치가 있으나 노후화되었거나, 고정장치가 부적절하거나 사용되지 않음. 사용자 교육 미흡.' },
+                    { grade: 'E', score: 10, criteria: '안전장치 미설치 또는 완전 파손 상태. 작업물이 고정되지 않아 심각한 사고 위험. 작업자 인식 부족.' },
+                  ],
+                },
+                {
+                  title: '안전하게 사용하기 위한 전용도구, 수공구의 개선 및 수공구 관리의 적절성',
+                  id: 'hand_tool_management',
+                  maxScore: 70,
+                  grades: [
+                    { grade: 'A', score: 70, criteria: '인체공학적으로 개선된 전용 수공구 사용, 손잡이·날 등 관리 상태 우수. 전용 보관함 및 점검체계 완비.' },
+                    { grade: 'B', score: 56, criteria: '일부 전용 수공구 사용, 기본적인 유지·관리 수행. 안전을 고려한 손잡이 교체 또는 날 교체 이행.' },
+                    { grade: 'C', score: 42, criteria: '기존 도구 사용 중이나, 작업자가 날 정비, 보호대 부착 등 관리 실천. 교육을 통해 주기적 점검 유도됨.' },
+                    { grade: 'D', score: 28, criteria: '전용 도구 있음에도 날 손상, 부적절한 보관 등으로 인해 위험요소 존재. 실제 개선 노력 부족.' },
+                    { grade: 'E', score: 14, criteria: '날 손상, 녹 발생, 손잡이 파손 등 위험 수공구 사용 지속. 안전 인식 미흡, 보관·정비 전혀 안됨.' },
+                  ],
+                },
+              ],
+            },
+            {
+              subComponent: '농기계',
+              subScore: 120,
+              indicators: [
+                {
+                  title: '안전한 사용과 사고예방을 위한 안전장치 설계의 적절성',
+                  id: 'safety_device_design',
+                  maxScore: 50,
+                  grades: [
+                    { grade: 'A', score: 50, criteria: '모든 필수 안전장치가 설계된 상태로 탑재되어 있고, 정상 작동하며 작업자가 사용 전 점검을 철저히 실시함.' },
+                    { grade: 'B', score: 40, criteria: '대부분의 안전장치가 존재하며, 주요 부분은 작동 상태 양호함. 일부 노후화나 파손이 있으나 전반적으로 기능함.' },
+                    { grade: 'C', score: 30, criteria: '기본적인 안전장치가 있으나 일시적인 조치(보강 테이프, 임시 커버 등)를 통해 보완됨. 사용자가 위험요소를 인지하고 있음.' },
+                    { grade: 'D', score: 20, criteria: '안전장치가 있지만 파손되었거나 제거되어 기능하지 않음. 기계 운용 시 해당 위험요소를 회피하는 방식으로 사용.' },
+                    { grade: 'E', score: 10, criteria: '안전장치가 존재하지 않거나 고장난 채로 방치. 사고 위험이 매우 높고, 사용자도 이에 대해 인식이 부족함.' },
+                  ],
+                },
+                {
+                  title: '안전한 기계의 구입부터 교육, 사용 및 정비 시의 안전 관리의 적절성',
+                  id: 'machine_management',
+                  maxScore: 70,
+                  grades: [
+                    { grade: 'A', score: 70, criteria: '기계 선정 시 안전 인증을 우선 고려하며, 정기적인 사용자 교육과 일상점검 기록이 있으며 정비 매뉴얼에 따라 관리됨.' },
+                    { grade: 'B', score: 56, criteria: '안전기준을 일부 고려하여 기계를 도입했으며, 간헐적 교육과 수리기록이 있음. 관리 수준 양호.' },
+                    { grade: 'C', score: 42, criteria: '기계 사용자는 기초교육을 받았으며, 자체 점검 및 관리가 비정기적으로 이루어짐. 기본 인식은 있음.' },
+                    { grade: 'D', score: 28, criteria: '기계 구입 시 안전 고려 없이 가격 위주로 선택, 사용자 교육 부족, 고장 시 임시 수리 위주 대응.' },
+                    { grade: 'E', score: 14, criteria: '기계 관련 교육 이수 없음, 정비 불량, 위험 상황 발생 후에도 방치됨. 정비 이력·기록도 없음.' },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        {
+          mainComponent: '농작업장',
+          mainScore: 220,
+          subComponents: [
+            {
+              subComponent: '농작물의 보관과 운반',
+              subScore: 130,
+              indicators: [
+                {
+                  title: '고저차의 제거, 작업영역과 운송통로 확보의 적절성',
+                  id: 'floor_and_path',
+                  maxScore: 40,
+                  grades: [
+                    { grade: 'A', score: 40, criteria: '작업장 내 고저차 완전 제거, 바닥 평탄화 및 미끄럼 방지처리. 운반 경로와 보관장소 명확히 분리되어 있고 통로 폭 적정.' },
+                    { grade: 'B', score: 32, criteria: '대부분 구역 평탄하며 고저차는 거의 없음. 주요 통로는 확보되었고 장애물 거의 없음.' },
+                    { grade: 'C', score: 24, criteria: '경사면 또는 고저차 존재하나 간이 경사로, 표시 등을 통한 보완 조치 있음. 통로가 좁지만 일시적 정리로 사용 가능.' },
+                    { grade: 'D', score: 16, criteria: '고저차가 크고, 경사면이나 입구가 불균형함. 통로에 장애물이 많고 운반 시 사고 위험 존재.' },
+                    { grade: 'E', score: 8, criteria: '높이 차가 심하거나 경사 심해 기계/인력 이동 곤란. 보관장소와 통로 혼재, 물건 적치로 사고 위험 높음.' },
+                  ],
+                },
+                {
+                  title: '물건의 취급자세와, 중량과 운반 방법의 적절성',
+                  id: 'handling_heavy_items',
+                  maxScore: 90,
+                  grades: [
+                    { grade: 'A', score: 90, criteria: '운반 대상이 적절히 분할되어 있고, 운반기기(운반차, 리프트 등) 적극 활용. 허리 보호 자세 유지, 작업자 간 교대 원활.' },
+                    { grade: 'B', score: 72, criteria: '인력운반 포함되나 보조기구 사용, 작업자 교육 실시. 중량 적정, 무리한 반복작업 없음.' },
+                    { grade: 'C', score: 54, criteria: '일부 과도한 중량이 있으나 작업자가 자세 교육을 이수하거나, 휴식시간을 확보하여 위험을 일정 부분 상쇄.' },
+                    { grade: 'D', score: 36, criteria: '중량이 크고 부적절한 자세로 반복 운반함. 운반기구 미사용, 휴식 없이 작업 지속.' },
+                    { grade: 'E', score: 18, criteria: '인력으로 과도한 중량 반복 운반, 비틀린 자세, 허리/어깨 부담 심각. 교육 없이 장시간 지속.' },
+                  ],
+                },
+              ],
+            },
+            {
+              subComponent: '작업장 정비',
+              subScore: 90,
+              indicators: [
+                {
+                  title: '출입구의 폭과 통로의 확보, 장애물 제거 및 경사 정돈의 적절성',
+                  id: 'access_and_aisles',
+                  maxScore: 30,
+                  grades: [
+                    { grade: 'A', score: 30, criteria: '출입구 폭 충분, 진입 경사 적절. 통로가 충분히 확보되어 있고 장애물 없음. 바닥은 평탄하고 미끄럼 방지 처리됨.' },
+                    { grade: 'B', score: 24, criteria: '주요 진입로는 안전하며 통로 확보 양호. 일부 좁은 구역이나 일시적 장애물 있음. 경사는 있으나 위험도 낮음.' },
+                    { grade: 'C', score: 18, criteria: '통로가 협소하거나 일부 장애물이 존재하나 작업자가 이를 인지하고 회피 가능. 바닥 기울기 보완조치 없음.' },
+                    { grade: 'D', score: 12, criteria: '출입구 협소하거나 경사 심함. 통로 내 물건 적치 또는 케이블 방치 등으로 사고 위험 있음.' },
+                    { grade: 'E', score: 6, criteria: '통로 확보 전혀 안 됨. 진입 불가 수준의 장애물 다수 존재. 바닥이 매우 미끄럽거나 기울어짐 심해 사고 위험 높음.' },
+                  ],
+                },
+                {
+                  title: '배치 개선과 작업효율성 증대를 위한 작업장 개선의 적절성',
+                  id: 'layout_and_efficiency',
+                  maxScore: 60,
+                  grades: [
+                    { grade: 'A', score: 60, criteria: '작업 동선이 직관적이고 효율적임. 작업대, 자재, 도구 등이 사용 빈도와 동선에 맞춰 체계적으로 배치됨.' },
+                    { grade: 'B', score: 48, criteria: '기본적인 동선은 확보되며 주요 기기와 자재 배치는 적절함. 개선 여지 있으나 작업 효율성 양호.' },
+                    { grade: 'C', score: 36, criteria: '배치가 다소 무질서하나 작업자가 순서를 조절하며 사용 가능. 반복 이동이나 불필요한 동선 발생.' },
+                    { grade: 'D', score: 24, criteria: '동선에 맞지 않는 배치로 인해 작업 효율 낮고 충돌, 방해 발생. 정리개선 시도가 없거나 미흡.' },
+                    { grade: 'E', score: 12, criteria: '작업대, 자재, 기기 등이 무계획적으로 배치되어 있어 사고 위험 매우 높고 작업 효율도 매우 낮음.' },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        {
+          mainComponent: '위험물질',
+          mainScore: 240,
+          subComponents: [
+            {
+              subComponent: '작업환경',
+              subScore: 120,
+              indicators: [
+                {
+                  title: '외부환경 차단과 추위, 더위 등 발생원의 차단 유무와 조명의 적절성',
+                  id: 'environmental_factors',
+                  maxScore: 40,
+                  grades: [
+                    { grade: 'A', score: 40, criteria: '외부환경(바람·직사광선·한기 등) 완전히 차단 가능. 온습도 제어 설비 구비. 조도(조명) 균일하고 충분함.' },
+                    { grade: 'B', score: 32, criteria: '기본적인 차단 구조나 차양막·가림막 등 존재. 냉난방장비 일부 사용. 조명은 충분하나 약간의 사각지대 있음.' },
+                    { grade: 'C', score: 24, criteria: '차단장치가 없거나 한시적(천막 등)이며, 조명 일부 부재하나 자연광이나 이동형 조명으로 보완 가능.' },
+                    { grade: 'D', score: 16, criteria: '외부환경에 거의 그대로 노출, 작업 시 더위/추위가 심각. 조명이 어둡고 시야 불량. 작업자 피로도 높음.' },
+                    { grade: 'E', score: 8, criteria: '차단시설 전무, 악조건(직사광선, 바람, 비 등) 그대로 노출됨. 조명 없음 또는 고장 상태. 사고 위험 매우 높음.' },
+                  ],
+                },
+                {
+                  title: '환기, 분진, 소음, 진동 등 위해 환경관리의 적절성',
+                  id: 'hazard_management',
+                  maxScore: 80,
+                  grades: [
+                    { grade: 'A', score: 80, criteria: '기계 환기장치와 자연환기 모두 확보. 소음·진동 방지장비(흡음재, 방진패드 등) 설치. 유해 요소 저감 적극 관리됨.' },
+                    { grade: 'B', score: 64, criteria: '자연환기는 가능하고 국소 환기장치 또는 흡입기 등 일부 구비. 일부 유해요소 존재하나 관리 가능.' },
+                    { grade: 'C', score: 48, criteria: '환기창이나 간이 환기팬만 있음. 소음·분진 등의 유해요소는 존재하나 단시간 노출로 제한. 사용자가 인지하고 있음.' },
+                    { grade: 'D', score: 32, criteria: '환기장치 없음 또는 불량, 작업공간에 분진·소음 지속 발생. 보호구 없이 장시간 노출.' },
+                    { grade: 'E', score: 16, criteria: '밀폐된 공간, 환기 불가, 분진·소음·진동이 동시에 존재하며, 작업자에게 지속적 건강 위해 가능성 존재.' },
+                  ],
+                },
+              ],
+            },
+            {
+              subComponent: '농약 및 연료',
+              subScore: 120,
+              indicators: [
+                {
+                  title: '농약의 보관 상태, 사용 보호구 및 농약 사용 및 관리 상태의 적절성',
+                  id: 'pesticide_management',
+                  maxScore: 100,
+                  grades: [
+                    { grade: 'A', score: 100, criteria: '농약 전용 보관함(잠금 장치 있음) 사용, 이중 용기 또는 누액 방지 구조. 보호구(고글, 장갑, 방제복 등) 전 항목 착용. 사용 전·후 정리 철저.' },
+                    { grade: 'B', score: 80, criteria: '농약은 안전한 실내에 보관되며 잠금 가능. 보호구는 대부분 착용하나 일부 누락 있음. 사용 후 관리 양호.' },
+                    { grade: 'C', score: 60, criteria: '보관은 가정용 창고나 일반 창고 일부 공간을 활용하나 밀폐·표지 있음. 보호구는 필수 항목 중 일부만 착용. 관리기록 미흡.' },
+                    { grade: 'D', score: 40, criteria: '농약이 노출된 장소(개방된 선반, 기계실 등)에 보관. 보호구 착용 미흡하거나 일부 없음. 취급지침 미숙지.' },
+                    { grade: 'E', score: 20, criteria: '농약 무단 보관, 흘러내림, 일반 식자재와 혼합 보관. 보호구 전혀 없음 또는 부적절한 장비 사용. 사고 위험 매우 높음.' },
+                  ],
+                },
+                {
+                  title: '연료의 취급 및 연료용 저장 장소의 안전관리의 적절성',
+                  id: 'fuel_management',
+                  maxScore: 20,
+                  grades: [
+                    { grade: 'A', score: 20, criteria: '연료는 전용 저장시설(이중 용기, 환기창, 잠금장치 있음)에 보관. 화기 엄격 차단. 주입구 별도 마련. 주입 시 소형 깔때기·받침대 등 활용.' },
+                    { grade: 'B', score: 16, criteria: '연료는 별도 지정 구역에 보관되며 뚜껑·환기창 있음. 화기 표지 있음. 주입도구 있음. 기본 안전수칙 준수.' },
+                    { grade: 'C', score: 12, criteria: '일반 창고 내 일부 공간에 보관, 인화물질 표지 있음. 화기는 분리되었으나 환기 미흡. 주입 시 보조도구 없음.' },
+                    { grade: 'D', score: 8, criteria: '연료통을 작업장 안쪽에 무작위 보관, 뚜껑 일부 누락. 화기와 연료 보관장소 가까움. 환기 불량.' },
+                    { grade: 'E', score: 4, criteria: '연료통이 외부에 방치되거나 누액 있음. 화기 근처에서 주입하거나 흡연. 심각한 안전위반 및 화재 가능성 존재.' },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        {
+          mainComponent: '안전환경',
+          mainScore: 120,
+          subComponents: [
+            {
+              subComponent: '안전 및 보호구 관리',
+              subScore: 120,
+              indicators: [
+                {
+                  title: '보호구의 선택과 사용, 안전관리 및 교육의 적절성',
+                  id: 'ppe_management',
+                  maxScore: 80,
+                  grades: [
+                    { grade: 'A', score: 80, criteria: '모든 작업에 맞는 보호구를 적절히 선택·지급. 일상적 착용 습관화. 안전교육 정기 실시 및 기록 있음. 보호구 상태 양호하게 유지·관리됨.' },
+                    { grade: 'B', score: 64, criteria: '대부분의 작업에 보호구 지급 및 착용. 교육은 정기적이진 않지만 비정기적으로 이루어짐. 일부 보호구는 마모되었으나 사용 가능.' },
+                    { grade: 'C', score: 48, criteria: '보호구 일부(장갑, 모자 등)만 선택적 사용. 교육은 일시적·구두로 전달됨. 사용 인식은 있으나 실천 부족.' },
+                    { grade: 'D', score: 32, criteria: '보호구 지급은 되었으나 대부분 착용하지 않음. 교육도 형식적으로 시행되며, 관리 체계 없음.' },
+                    { grade: 'E', score: 16, criteria: '보호구 미지급 또는 전혀 착용하지 않음. 교육도 시행되지 않으며, 사고 발생 가능성 매우 높음.' },
+                  ],
+                },
+                {
+                  title: '전기와 가스 기기 및 설비의 안전한 사용과 화재 방지의 적절성',
+                  id: 'electrical_and_gas_safety',
+                  maxScore: 40,
+                  grades: [
+                    { grade: 'A', score: 40, criteria: '전기설비는 규격품 사용, 누전차단기 설치, 배선 정리 정돈. 가스기기 점검표 운영. 소화기 및 경보기 설치·작동 상태 양호.' },
+                    { grade: 'B', score: 32, criteria: '대부분의 전기·가스기기는 적정 상태. 간헐적 점검 실시. 소화기는 설치되어 있으나 일부 위치 불명확.' },
+                    { grade: 'C', score: 24, criteria: '전기·가스기기 사용에 위험 요소 일부 있음(배선 노출, 점검 미흡). 소화기 설치되었으나 사용법 숙지 미흡.' },
+                    { grade: 'D', score: 16, criteria: '배선 정리되지 않거나 가스기기 노후됨. 화기 근처에 연료나 전기기기 배치. 소화기 미비 또는 방치.' },
+                    { grade: 'E', score: 8, criteria: '전기배선 낙후, 누전 우려 심각. 가스기기 방치 및 누출 가능성 있음. 화재 예방 조치 전혀 없음. 매우 위험.' },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      currentScore: 0,
+      targetScore: 0,
+      totalMaxScore: 0,
+    };
+
+    // DOM 로드 후 초기화
+    document.addEventListener('DOMContentLoaded', () => {
+      appState.totalMaxScore = appState.evaluationData.reduce((acc, mainItem) => acc + mainItem.mainScore, 0);
+      renderApp();
+    });
+
+    // 앱의 전체 UI를 렌더링하는 함수
+    function renderApp() {
+      const appDiv = document.getElementById('app');
+      appDiv.innerHTML = ''; // 기존 내용 초기화
+
+      const container = document.createElement('div');
+      container.className = "max-w-7xl mx-auto bg-white p-8 rounded-2xl shadow-xl";
+
+      // 헤더
+      container.innerHTML += `
+        <h1 class="text-4xl font-bold text-center mb-6 text-green-700">안전관리 수준 평가 프로그램</h1>
+        <p class="text-center text-lg text-gray-600 mb-8">
+          각 평가지표에 대한 **개선전 수준**과 **개선후 수준**을 선택하여 안전관리 수준 증가율을 측정하고, 보고서를 생성해 보세요.
+        </p>
+      `;
+
+      // 기본 정보 입력 섹션
+      container.innerHTML += createBasicInfoSection();
+
+      if (appState.selectedItemId) {
+        // 상세 지표 페이지
+        container.innerHTML += createIndicatorDetailSection();
+      } else {
+        // 목록 페이지
+        container.innerHTML += createIndicatorListSection();
+      }
+
+      // 종합 결과 및 차트
+      container.innerHTML += createResultSection();
+      
+      appDiv.appendChild(container);
+      
+      // 이벤트 리스너 재부착
+      attachEventListeners();
+      
+      // 차트 렌더링
+      renderChart();
+    }
+
+    // 기본 정보 입력 섹션 생성
+    function createBasicInfoSection() {
+      const { evaluatorName, phoneNumber, region, cropGroup } = appState.basicInfo;
+      return `
+        <div class="bg-gray-50 p-6 rounded-xl shadow-md border border-gray-200 mb-8">
+          <h2 class="text-2xl font-bold text-green-800 mb-4">기본 정보</h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <label for="evaluatorName" class="block text-gray-600 font-medium mb-1">평가자명</label>
+              <input type="text" id="evaluatorName" name="evaluatorName" value="${evaluatorName}" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 transition-colors duration-200" placeholder="홍길동">
+            </div>
+            <div>
+              <label for="phoneNumber" class="block text-gray-600 font-medium mb-1">전화번호</label>
+              <input type="text" id="phoneNumber" name="phoneNumber" value="${phoneNumber}" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 transition-colors duration-200" placeholder="010-1234-5678">
+            </div>
+            <div>
+              <label for="region" class="block text-gray-600 font-medium mb-1">지역</label>
+              <input type="text" id="region" name="region" value="${region}" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 transition-colors duration-200" placeholder="부산시 기장군">
+            </div>
+            <div>
+              <label for="cropGroup" class="block text-gray-600 font-medium mb-1">작목반</label>
+              <input type="text" id="cropGroup" name="cropGroup" value="${cropGroup}" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 transition-colors duration-200" placeholder="시설채소반">
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // 지표 목록 섹션 생성
+    function createIndicatorListSection() {
+      let html = `<div class="mb-12 no-print">`;
+      appState.evaluationData.forEach(mainItem => {
+        html += `
+          <div class="mb-6 bg-gray-50 p-6 rounded-xl shadow-md border border-gray-200">
+            <h2 class="text-2xl font-bold text-green-800 mb-4">${mainItem.mainComponent} (${mainItem.mainScore}점)</h2>
+        `;
+        mainItem.subComponents.forEach(subItem => {
+          html += `
+            <div class="mb-4 pl-4 border-l-4 border-green-500">
+              <h3 class="text-xl font-semibold text-green-700 mb-2">${subItem.subComponent} (${subItem.subScore}점)</h3>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          `;
+          subItem.indicators.forEach(indicator => {
+            const statusIcon = getStatusIcon(indicator.id);
+            html += `
+              <button data-indicator-id="${indicator.id}" class="indicator-button flex items-center justify-between p-4 bg-white rounded-lg shadow-sm border border-gray-100 hover:bg-green-50 transition duration-200 ease-in-out text-left">
+                <span class="text-md font-medium text-green-900">${indicator.title}</span>
+                <span class="ml-4 flex items-center">${statusIcon}</span>
+              </button>
+            `;
+          });
+          html += `</div></div>`;
+        });
+        html += `</div>`;
+      });
+      html += `</div>`;
+      return html;
+    }
+
+    // 지표 상세 페이지 생성
+    function createIndicatorDetailSection() {
+      const selectedIndicator = findSelectedItem(appState.selectedItemId);
+      if (!selectedIndicator) return '';
+
+      const currentGrade = appState.currentGrades[selectedIndicator.id]?.grade || '';
+      const targetGrade = appState.targetGrades[selectedIndicator.id]?.grade || '';
+      const beforeDescription = appState.descriptions[selectedIndicator.id]?.before || '';
+      const afterDescription = appState.descriptions[selectedIndicator.id]?.after || '';
+
+      let gradeButtonsHtml = '';
+      selectedIndicator.grades.forEach(grade => {
+        const isCurrent = currentGrade === grade.grade;
+        gradeButtonsHtml += `
+          <label class="cursor-pointer transition duration-200 ease-in-out p-3 rounded-lg text-center font-bold ${isCurrent ? 'bg-green-500 text-white shadow-inner' : 'bg-green-100 text-green-700 hover:bg-green-200'}">
+            <input type="radio" name="current-${selectedIndicator.id}" value="${grade.grade}" class="hidden" ${isCurrent ? 'checked' : ''}>
+            ${grade.grade}
+          </label>
+        `;
+      });
+
+      let targetGradeButtonsHtml = '';
+      selectedIndicator.grades.forEach(grade => {
+        const isCurrent = targetGrade === grade.grade;
+        targetGradeButtonsHtml += `
+          <label class="cursor-pointer transition duration-200 ease-in-out p-3 rounded-lg text-center font-bold ${isCurrent ? 'bg-blue-500 text-white shadow-inner' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'}">
+            <input type="radio" name="target-${selectedIndicator.id}" value="${grade.grade}" class="hidden" ${isCurrent ? 'checked' : ''}>
+            ${grade.grade}
+          </label>
+        `;
+      });
+
+      let criteriaHtml = '';
+      selectedIndicator.grades.forEach(grade => {
+        criteriaHtml += `
+          <div class="p-4 rounded-md border border-gray-200">
+            <p class="font-bold text-lg text-gray-800 mb-1">등급 ${grade.grade} (${grade.score}점)</p>
+            <p class="text-gray-600 text-sm">${grade.criteria}</p>
+          </div>
+        `;
+      });
+
+      return `
+        <div class="bg-gray-50 p-6 rounded-xl shadow-md border border-gray-200 mb-8">
+          <button data-action="back" class="mb-4 flex items-center text-green-700 font-bold hover:text-green-900 transition-colors duration-200">
+            <span class="mr-1">←</span> 목록으로 돌아가기
+          </button>
+          <h3 class="text-2xl font-bold mb-4 text-green-800">${selectedIndicator.title}</h3>
+          
+          <div class="bg-white p-6 rounded-lg shadow-inner mb-6">
+            <h4 class="text-xl font-semibold mb-3 text-gray-700">등급 선택</h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label class="block text-gray-600 font-medium mb-2">개선전 수준</label>
+                <div class="flex space-x-2" data-grade-type="current">
+                  ${gradeButtonsHtml}
+                </div>
+              </div>
+              <div>
+                <label class="block text-gray-600 font-medium mb-2">개선후 수준</label>
+                <div class="flex space-x-2" data-grade-type="target">
+                  ${targetGradeButtonsHtml}
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="bg-white p-6 rounded-lg shadow-inner mb-6">
+            <h4 class="text-xl font-semibold mb-3 text-gray-700">상태 기록</h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label class="block text-gray-600 font-medium mb-2">개선전 상태</label>
+                <textarea data-description-type="before" class="w-full h-32 p-3 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 transition-colors duration-200" placeholder="개선전 상태를 자세히 기록해 주세요.">${beforeDescription}</textarea>
+              </div>
+              <div>
+                <label class="block text-gray-600 font-medium mb-2">개선후 상태</label>
+                <textarea data-description-type="after" class="w-full h-32 p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200" placeholder="개선후 상태를 자세히 기록해 주세요.">${afterDescription}</textarea>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white p-6 rounded-lg shadow-inner">
+            <h4 class="text-xl font-semibold mb-3 text-gray-700">평가 기준</h4>
+            <div class="space-y-4">${criteriaHtml}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    // 종합 결과 섹션 생성
+    function createResultSection() {
+      const currentScore = calculateScore('current');
+      const targetScore = calculateScore('target');
+      const improvementPercentage = currentScore > 0 ? ((targetScore - currentScore) / currentScore) * 100 : 0;
+      
+      return `
+        <div class="bg-green-50 p-8 rounded-2xl shadow-xl text-center no-print">
+          <h2 class="text-3xl font-bold text-green-800 mb-4">종합 결과</h2>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 text-gray-700">
+            <div class="p-4 bg-white rounded-lg shadow-inner">
+              <p class="text-lg font-semibold">개선전 총 점수</p>
+              <p class="text-4xl font-extrabold text-green-600">${currentScore}</p>
+            </div>
+            <div class="p-4 bg-white rounded-lg shadow-inner">
+              <p class="text-lg font-semibold">개선후 총 점수</p>
+              <p class="text-4xl font-extrabold text-blue-600">${targetScore}</p>
+            </div>
+            <div class="p-4 bg-white rounded-lg shadow-inner">
+              <p class="text-lg font-semibold">총 만점</p>
+              <p class="text-4xl font-extrabold text-red-600">${appState.totalMaxScore}</p>
+            </div>
+          </div>
+          <p class="text-2xl font-bold text-green-800">
+            안전관리 수준 증가율: 
+            <span class="font-extrabold ${improvementPercentage > 0 ? 'text-blue-600' : 'text-gray-600'}">
+              ${improvementPercentage.toFixed(2)}%
+            </span>
+          </p>
+          <div class="flex justify-center space-x-4 mt-8">
+            <button id="generate-report-btn" class="px-6 py-3 bg-green-600 text-white font-bold rounded-full hover:bg-green-700 transition duration-300 shadow-lg">
+              보고서 생성
+            </button>
+            <button id="export-csv-btn" class="px-6 py-3 bg-blue-600 text-white font-bold rounded-full hover:bg-blue-700 transition duration-300 shadow-lg">
+              CSV로 내보내기
+            </button>
+          </div>
+        </div>
+
+        <div class="mt-12 bg-white p-8 rounded-2xl shadow-xl border border-gray-200 no-print">
+          <h2 class="text-3xl font-bold text-center mb-6 text-green-800">안전관리 점수 시각화</h2>
+          <div class="chart-container">
+            <canvas id="scoreChart"></canvas>
+          </div>
+        </div>
+      `;
+    }
+
+    // DOM 이벤트 리스너 부착
+    function attachEventListeners() {
+      // 기본 정보 입력
+      document.querySelectorAll('input[name]').forEach(input => {
+        input.addEventListener('input', (e) => {
+          appState.basicInfo[e.target.name] = e.target.value;
+        });
+      });
+
+      // 지표 목록 버튼
+      document.querySelectorAll('.indicator-button').forEach(button => {
+        button.addEventListener('click', (e) => {
+          const indicatorId = e.currentTarget.dataset.indicatorId;
+          appState.selectedItemId = indicatorId;
+          renderApp();
+        });
+      });
+
+      // 뒤로가기 버튼
+      const backButton = document.querySelector('[data-action="back"]');
+      if (backButton) {
+        backButton.addEventListener('click', () => {
+          appState.selectedItemId = null;
+          renderApp();
+        });
+      }
+
+      // 등급 선택 라디오 버튼
+      document.querySelectorAll('input[type="radio"]').forEach(radio => {
+        radio.addEventListener('change', (e) => {
+          const type = e.target.name.split('-')[0];
+          const indicatorId = e.target.name.split('-')[1];
+          const grade = e.target.value;
+          
+          const selectedItem = findSelectedItem(indicatorId);
+          if (!selectedItem) return;
+          const selectedGrade = selectedItem.grades.find(g => g.grade === grade);
+
+          if (type === 'current') {
+            appState.currentGrades[indicatorId] = selectedGrade;
+          } else if (type === 'target') {
+            appState.targetGrades[indicatorId] = selectedGrade;
+          }
+          
+          updateScores();
+          renderApp();
+        });
+      });
+
+      // 상태 기록 텍스트 영역
+      document.querySelectorAll('textarea').forEach(textarea => {
+        textarea.addEventListener('input', (e) => {
+          const type = e.target.dataset.descriptionType;
+          const indicatorId = appState.selectedItemId;
+          if (!appState.descriptions[indicatorId]) {
+            appState.descriptions[indicatorId] = {};
+          }
+          appState.descriptions[indicatorId][type] = e.target.value;
+        });
+      });
+      
+      // 보고서 생성 버튼
+      const generateReportBtn = document.getElementById('generate-report-btn');
+      if (generateReportBtn) {
+        generateReportBtn.addEventListener('click', generateReport);
+      }
+
+      // CSV 내보내기 버튼
+      const exportCsvBtn = document.getElementById('export-csv-btn');
+      if (exportCsvBtn) {
+        exportCsvBtn.addEventListener('click', exportToCsv);
+      }
+    }
+
+    // 점수 업데이트 함수
+    function updateScores() {
+      appState.currentScore = calculateScore('current');
+      appState.targetScore = calculateScore('target');
+    }
+
+    // 점수 계산 함수
+    function calculateScore(type) {
+      let score = 0;
+      appState.evaluationData.forEach(mainItem => {
+        mainItem.subComponents.forEach(subItem => {
+          subItem.indicators.forEach(indicator => {
+            const gradeInfo = type === 'current' ? appState.currentGrades[indicator.id] : appState.targetGrades[indicator.id];
+            if (gradeInfo) {
+              score += gradeInfo.score;
+            }
+          });
+        });
+      });
+      return score;
+    }
+
+    // 지표 찾기 함수
+    function findSelectedItem(itemId) {
+      for (const mainItem of appState.evaluationData) {
+        for (const subItem of mainItem.subComponents) {
+          const found = subItem.indicators.find(indicator => indicator.id === itemId);
+          if (found) return found;
+        }
+      }
+      return null;
+    }
+
+    // 상태 아이콘
+    function getStatusIcon(itemId) {
+      const current = appState.currentGrades[itemId];
+      const target = appState.targetGrades[itemId];
+      if (current && target && current.score < target.score) {
+        return `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-up text-blue-500"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>`;
+      } else if (current && target && current.score > target.score) {
+        return `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-down text-red-500"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>`;
+      } else if (current && target && current.score === target.score) {
+        return `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-circle text-green-500"><path d="M22 11.08V12a10 10 0 1 1-5.93-8.5"/><path d="m11 17.2-4.15-4.18"/><path d="m11 17.2-2.85-2.82"/><path d="M11 17.2 16.5 9"/></svg>`;
+      }
+      return `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle text-gray-400"><circle cx="12" cy="12" r="10"/></svg>`;
+    }
+
+    // 차트 렌더링
+    let scoreChart;
+    function renderChart() {
+      const ctx = document.getElementById('scoreChart');
+      if (!ctx) return;
+      
+      const chartData = {
+        labels: ['개선전 수준', '개선후 수준', '총 만점'],
+        datasets: [{
+          data: [appState.currentScore, appState.targetScore, appState.totalMaxScore],
+          backgroundColor: ['#4CAF50', '#2196F3', '#f44336'],
+          borderWidth: 1,
+          barPercentage: 0.6,
+          categoryPercentage: 0.8,
+        }]
+      };
+
+      if (scoreChart) {
+        scoreChart.destroy();
+      }
+
+      scoreChart = new Chart(ctx, {
+        type: 'bar',
+        data: chartData,
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                title: (context) => context[0].label,
+                label: (context) => `점수: ${context.raw}점`,
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              max: appState.totalMaxScore,
+              grid: { color: '#e0e0e0' },
+              ticks: { color: '#555' }
+            },
+            x: {
+              grid: { display: false },
+              ticks: { color: '#555' }
+            }
+          }
+        }
+      });
+    }
+
+    // 보고서 생성
+    function generateReport() {
+      // 파일명 생성
+      const { evaluatorName, region, cropGroup } = appState.basicInfo;
+      const filename = [evaluatorName, region, cropGroup].filter(Boolean).join('_') || '안전관리_평가_보고서';
+
+      const reportWindow = window.open('', '_blank');
+      if (!reportWindow) {
+        alert('팝업 차단이 설정되어 있습니다. 팝업 차단을 해제해 주세요.');
+        return;
+      }
+      
+      const currentScore = calculateScore('current');
+      const targetScore = calculateScore('target');
+      const improvementPercentage = currentScore > 0 ? ((targetScore - currentScore) / currentScore) * 100 : 0;
+      
+      // 보고서 내용 생성
+      let reportContent = `
+        <!DOCTYPE html>
+        <html lang="ko">
+        <head>
+          <title>${filename}</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap');
+            body { font-family: 'Noto Sans KR', sans-serif; padding: 2rem; color: #333; line-height: 1.6; }
+            h1, h2, h3 { color: #166534; }
+            h1 { font-size: 2rem; text-align: center; margin-bottom: 2rem; }
+            h2 { font-size: 1.5rem; border-bottom: 2px solid #a3e635; padding-bottom: 0.5rem; margin-top: 2rem; }
+            h3 { font-size: 1.25rem; margin-top: 1.5rem; }
+            .basic-info-table, .report-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+            .basic-info-table th, .basic-info-table td, .report-table th, .report-table td { border: 1px solid #d1d5db; padding: 0.75rem; text-align: left; }
+            .basic-info-table th { width: 20%; background-color: #f3f4f6; }
+            .report-table th { background-color: #f9fafb; font-weight: bold; }
+            .summary-box { display: flex; justify-content: space-around; text-align: center; background-color: #ecfdf5; border: 1px solid #d1fae5; padding: 1.5rem; border-radius: 0.75rem; margin-top: 1.5rem; }
+            .summary-item p { margin: 0; }
+            .score-number { font-size: 2.5rem; font-weight: bold; }
+            .score-current { color: #15803d; }
+            .score-target { color: #1d4ed8; }
+            .score-total { color: #dc2626; }
+            .improvement { font-size: 1.5rem; font-weight: bold; margin-top: 1rem; }
+            .description-box { margin-top: 1rem; padding: 1rem; background-color: #fafafa; border: 1px solid #e5e7eb; border-radius: 0.5rem; white-space: pre-wrap; }
+          </style>
+        </head>
+        <body>
+          <h1>안전관리 수준 평가 보고서</h1>
+
+          <h2>기본 정보</h2>
+          <table class="basic-info-table">
+            <tr><th>평가자명</th><td>${appState.basicInfo.evaluatorName || '-'}</td><th>전화번호</th><td>${appState.basicInfo.phoneNumber || '-'}</td></tr>
+            <tr><th>지역</th><td>${appState.basicInfo.region || '-'}</td><th>작목반</th><td>${appState.basicInfo.cropGroup || '-'}</td></tr>
+          </table>
+
+          <h2>종합 결과 요약</h2>
+          <div class="summary-box">
+            <div class="summary-item">
+              <p>개선전 총 점수</p>
+              <p class="score-number score-current">${currentScore}</p>
+            </div>
+            <div class="summary-item">
+              <p>개선후 총 점수</p>
+              <p class="score-number score-target">${targetScore}</p>
+            </div>
+            <div class="summary-item">
+              <p>총 만점</p>
+              <p class="score-number score-total">${appState.totalMaxScore}</p>
+            </div>
+          </div>
+          <p class="improvement">안전관리 수준 증가율: <span style="color: ${improvementPercentage > 0 ? '#1d4ed8' : '#6b7280'}">${improvementPercentage.toFixed(2)}%</span></p>
+
+          <h2>세부 평가 결과</h2>
+          <table class="report-table">
+            <thead>
+              <tr>
+                <th>분류</th>
+                <th>지표</th>
+                <th>개선전 등급 (점수)</th>
+                <th>개선후 등급 (점수)</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+      
+      appState.evaluationData.forEach(mainItem => {
+        mainItem.subComponents.forEach(subItem => {
+          subItem.indicators.forEach(indicator => {
+            const currentGrade = appState.currentGrades[indicator.id];
+            const targetGrade = appState.targetGrades[indicator.id];
+            
+            reportContent += `
+              <tr>
+                <td>${mainItem.mainComponent} > ${subItem.subComponent}</td>
+                <td>${indicator.title}</td>
+                <td>${currentGrade ? `${currentGrade.grade} (${currentGrade.score}점)` : '-'}</td>
+                <td>${targetGrade ? `${targetGrade.grade} (${targetGrade.score}점)` : '-'}</td>
+              </tr>
+            `;
+          });
+        });
+      });
+      
+      reportContent += `
+            </tbody>
+          </table>
+          
+          <h2>개선 전/후 상세 기록</h2>
+      `;
+      
+      appState.evaluationData.forEach(mainItem => {
+        mainItem.subComponents.forEach(subItem => {
+          subItem.indicators.forEach(indicator => {
+            const beforeDescription = appState.descriptions[indicator.id]?.before || '-';
+            const afterDescription = appState.descriptions[indicator.id]?.after || '-';
+            
+            reportContent += `
+              <h3>${indicator.title}</h3>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div>
+                  <h4>개선전 상태</h4>
+                  <div class="description-box">${beforeDescription}</div>
+                </div>
+                <div>
+                  <h4>개선후 상태</h4>
+                  <div class="description-box">${afterDescription}</div>
+                </div>
+              </div>
+            `;
+          });
+        });
+      });
+      
+      reportContent += `
+        </body>
+        </html>
+      `;
+      
+      reportWindow.document.write(reportContent);
+      reportWindow.document.close();
+      
+      reportWindow.onload = () => {
+        // 인쇄 창의 기본 파일명으로 사용될 title을 설정합니다.
+        reportWindow.document.title = filename; 
+        setTimeout(() => {
+          reportWindow.print();
+        }, 500); // 인쇄 창이 뜨기까지 약간의 지연시간을 둡니다.
+      };
+    }
+
+    // CSV 내보내기 함수
+    function exportToCsv() {
+      const { evaluatorName, phoneNumber, region, cropGroup } = appState.basicInfo;
+      
+      // 파일명 생성
+      const filename = [evaluatorName, region, cropGroup].filter(Boolean).join('_') || '안전관리_평가_보고서';
+      
+      // 데이터 헤더
+      const headers = [
+        '평가자명', '전화번호', '지역', '작목반',
+        '대분류', '중분류', '지표', '개선전 등급', '개선전 점수', '개선후 등급', '개선후 점수',
+        '개선전 상태', '개선후 상태'
+      ].join(',') + '\n';
+      
+      let csvContent = headers;
+
+      // 데이터 행 추가
+      appState.evaluationData.forEach(mainItem => {
+        mainItem.subComponents.forEach(subItem => {
+          subItem.indicators.forEach(indicator => {
+            const currentGrade = appState.currentGrades[indicator.id]?.grade || '';
+            const currentScore = appState.currentGrades[indicator.id]?.score || '';
+            const targetGrade = appState.targetGrades[indicator.id]?.grade || '';
+            const targetScore = appState.targetGrades[indicator.id]?.score || '';
+            const beforeDescription = appState.descriptions[indicator.id]?.before?.replace(/"/g, '""').replace(/\n/g, ' ') || '';
+            const afterDescription = appState.descriptions[indicator.id]?.after?.replace(/"/g, '""').replace(/\n/g, ' ') || '';
+
+            // CSV 데이터 행 (콤마로 구분, 따옴표 처리)
+            const row = [
+              `"${evaluatorName}"`, `"${phoneNumber}"`, `"${region}"`, `"${cropGroup}"`,
+              `"${mainItem.mainComponent}"`, `"${subItem.subComponent}"`, `"${indicator.title}"`,
+              `"${currentGrade}"`, `"${currentScore}"`, `"${targetGrade}"`, `"${targetScore}"`,
+              `"${beforeDescription}"`, `"${afterDescription}"`
+            ].join(',') + '\n';
+
+            csvContent += row;
+          });
+        });
+      });
+
+      // Blob 객체 생성 및 파일 다운로드
+      const blob = new Blob(['\ufeff', csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `${filename}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>
