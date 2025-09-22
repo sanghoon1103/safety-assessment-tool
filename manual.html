@@ -11,7 +11,7 @@
             background-color: #f7fafc;
         }
         .manual-container {
-            max-width: 800px; /* 콘텐츠가 너무 넓게 퍼지지 않도록 최대 너비 설정 */
+            max-width: 900px;
             margin: 40px auto;
         }
         .manual-card {
@@ -19,7 +19,7 @@
             border-radius: 12px;
             padding: 2.5rem;
             margin-bottom: 2.5rem;
-            box-shadow: 0 4px_6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
         .manual-card h2 {
             font-size: 1.75rem;
@@ -38,15 +38,40 @@
             padding-left: 0.75rem;
             border-left: 4px solid #48bb78;
         }
-        .manual-card p, .manual-card li {
+        .manual-card p, .manual-card li div {
             color: #4a5568;
             line-height: 1.7;
+            /* ▼▼▼ 단어 깨짐 방지 스타일 추가 ▼▼▼ */
+            word-break: keep-all; 
         }
         .manual-card ol {
-            padding-left: 1.5rem;
+            list-style: none;
+            padding-left: 0;
+            counter-reset: step-counter;
         }
-        .manual-card li {
-            margin-bottom: 0.75rem;
+        .manual-card ol > li {
+            counter-increment: step-counter;
+            margin-bottom: 1.25rem;
+            display: flex;
+            align-items: flex-start;
+        }
+        .manual-card ol > li::before {
+            content: counter(step-counter);
+            font-weight: 700;
+            font-size: 1rem;
+            color: white;
+            background-color: #48bb78;
+            border-radius: 50%;
+            width: 1.75rem;
+            height: 1.75rem;
+            text-align: center;
+            line-height: 1.75rem;
+            margin-right: 1rem;
+            flex-shrink: 0;
+        }
+        /* ▼▼▼ 텍스트를 감싸는 div 추가에 따른 스타일 수정 ▼▼▼ */
+        .manual-card li div {
+            flex: 1;
         }
         .back-link {
             display: inline-block;
@@ -72,69 +97,38 @@
         <div class="manual-card">
             <h2>📝 위험성 평가 프로그램 매뉴얼</h2>
             <h3>프로그램 소개</h3>
-            <p>이 프로그램은 농작업 현장에서 발생할 수 있는 다양한 위험 요소를 체계적으로 파악하고, 개선 대책을 수립하여 위험도를 낮추기 위해 설계된 디지털 위험성 평가 도구입니다. 사용자는 미리 입력된 농작업별 위험 시나리오를 선택하거나, 현장에 맞는 위험 요인을 직접 입력하여 평가를 진행할 수 있습니다.</p>
+            <p>농작업 현장의 다양한 위험 요소를 체계적으로 파악하고 개선 대책을 수립하여 위험도를 낮추기 위한 디지털 평가 도구입니다. 미리 정의된 시나리오를 선택하거나 직접 위험을 입력하여 평가를 진행합니다.</p>
 
             <h3>단계별 사용법</h3>
-            <h4>1단계: 기본 정보 입력</h4>
-            <p>프로그램 상단의 기본 정보 섹션에 <strong>평가자명, 전화번호, 지역명, 작목반</strong>을 입력합니다. 이 정보는 보고서 생성 및 파일 저장 시 사용됩니다.</p>
-            
-            <h4>2단계: 위험성 평가 실행 (개선 전)</h4>
             <ol>
-                <li><strong>행 추가/삭제:</strong> <code>[행 추가]</code> 버튼으로 평가 항목을 추가하고, 각 행의 휴지통 아이콘으로 삭제합니다.</li>
-                <li><strong>작업 선택:</strong> 평가하려는 작업(예: 수확)과 세부작업(예: 과수 수확)을 목록에서 선택합니다.</li>
-                <li><strong>위험 선택:</strong> <code>[위험 선택]</code> 버튼을 눌러 나타나는 팝업 창에서 농장 상황과 가장 유사한 위험 사례를 선택합니다. 필요시 '실제 문제점' 내용을 수정하고 가중치를 조절한 후 <code>[선택 완료]</code>를 누릅니다.</li>
-                <li><strong>직접 입력:</strong> 목록에 없는 위험은 '작업 선택'에서 <code>[직접 입력]</code>을 선택하여 작업명, 문제점, 위험도(강도, 빈도, 가중치)를 수동으로 입력할 수 있습니다.</li>
-            </ol>
-            
-            <h4>3단계: 개선 대책 수립 및 평가 (개선 후)</h4>
-            <ol>
-                <li><strong>대책 입력:</strong> '3. 개선 후 위험성 평가' 표의 <strong>'대책'</strong> 칸에 위험을 줄이기 위한 구체적인 실천 계획을 작성합니다.</li>
-                <li><strong>개선 후 위험도 입력:</strong> 수립한 대책이 실행되었다고 가정했을 때, 예상되는 <strong>'개선 후 강도', '빈도', '가중치'</strong>를 각각 입력합니다. '개선 후 위험도'와 '위험성 감소율'은 자동으로 계산됩니다.</li>
-            </ol>
-            
-            <h4>4단계: 결과 확인 및 저장</h4>
-            <ol>
-                <li><strong>종합 결과 확인:</strong> 모든 평가 완료 후, 하단의 '종합 평가 요약' 섹션에서 개선 전/후 위험도 총점과 총 감소율을 한눈에 파악할 수 있습니다.</li>
-                <li><strong>보고서 생성:</strong> <code>[보고서 생성]</code> 버튼을 누르면 인쇄 가능한 형태의 깔끔한 보고서가 새 탭으로 열립니다.</li>
-                <li><strong>CSV 저장:</strong> <code>[CSV 저장]</code> 버튼을 누르면 모든 평가 데이터가 담긴 엑셀 호환 파일(.csv)이 <code>지역명_작목반명</code>으로 자동 저장됩니다.</li>
+                <li><div><strong>기본 정보 입력:</strong> 프로그램 상단에 평가자명, 연락처, 지역명, 작목반 등 기본 정보를 기입합니다.</div></li>
+                <li><div><strong>위험성 평가 실행:</strong> <code>[행 추가]</code> 버튼으로 항목을 만들고, '작업'과 '세부작업'을 선택합니다. <code>[위험 선택]</code> 버튼으로 농장 상황에 맞는 위험 사례를 선택하거나, <code>[직접 입력]</code>으로 새로운 위험을 정의합니다.</div></li>
+                <li><div><strong>개선 대책 수립:</strong> '개선 후 평가' 표의 '대책'란에 구체적인 개선 계획을 작성하고, 개선 후 예상되는 '강도', '빈도', '가중치'를 입력하여 위험도 감소율을 확인합니다.</div></li>
+                <li><div><strong>결과 확인 및 저장:</strong> 하단의 요약 섹션에서 결과를 확인하고, <code>[보고서 생성]</code>으로 인쇄하거나 <code>[CSV 저장]</code>으로 데이터를 파일로 내보냅니다.</div></li>
             </ol>
             
             <h3>💡 주요 기능 및 팁</h3>
-            <ul>
-                <li><strong>새 평가 시작:</strong> 여러 사람이 같은 컴퓨터를 사용할 경우, <code>[새 평가 시작 (기존 내용 삭제)]</code> 버튼을 눌러 이전 사용자의 기록을 지우고 깨끗한 상태에서 시작할 수 있습니다.</li>
-                <li><strong>자동 저장:</strong> 모든 평가 내용은 브라우저에 실시간으로 자동 저장되어, 실수로 창을 닫아도 작업 내용이 유실되지 않습니다.</li>
-            </ul>
+            <p><strong>새 평가 시작:</strong> 공용 컴퓨터에서는 <code>[새 평가 시작]</code> 버튼을 눌러 이전 기록을 지우고 시작하세요.<br><strong>자동 저장:</strong> 모든 진행 내용은 브라우저에 실시간으로 자동 저장되어 안전합니다.</p>
         </div>
 
         <div class="manual-card">
             <h2>📈 안전관리 수준 평가 프로그램 매뉴얼</h2>
             <h3>프로그램 소개</h3>
-            <p>이 프로그램은 농작업 현장의 안전관리 수준을 정량적으로 평가하고, 개선 계획에 따른 기대 효과를 예측하기 위한 전문 진단 도구입니다. 5가지 핵심 분야의 세부 지표에 대해 개선 전과 후의 수준을 각각 평가하여, 안전관리 수준이 얼마나 향상될 수 있는지를 <strong>증가율(%)</strong>로 한눈에 파악할 수 있습니다.</p>
+            <p>농작업 현장의 안전관리 수준을 정량적으로 평가하고 개선 효과를 예측하기 위한 전문 진단 도구입니다. 5개 분야의 세부 지표에 대해 '개선 전'과 '개선 후' 수준을 평가하여 향상도를 측정합니다.</p>
 
             <h3>단계별 사용법</h3>
-            <h4>1단계: 기본 정보 입력</h4>
-            <p>프로그램 상단의 기본 정보 섹션에 <strong>평가자명, 전화번호, 지역, 작목반</strong>을 입력합니다. 이 정보는 최종 보고서에 반영됩니다.</p>
-            
-            <h4>2단계: 평가 진행</h4>
             <ol>
-                <li><strong>평가지표 선택:</strong> 메인 화면의 지표 목록에서 평가하려는 항목(예: 작업 자세 개선...)을 클릭하여 상세 평가 페이지로 이동합니다. 각 지표의 아이콘으로 평가 진행 상태를 확인할 수 있습니다.</li>
-                <li><strong>등급 선택:</strong> 상세 페이지에서 <strong>'개선전 수준'</strong>과 <strong>'개선후 수준'</strong>에 대해 각각 <strong>A~E 등급 버튼</strong> 중 하나를 선택합니다. 페이지 하단의 <strong>'평가 기준'</strong>을 참고하여 객관적으로 평가합니다.</li>
-                <li><strong>상태 기록:</strong> '개선전 상태'와 '개선후 상태' 입력란에 현재 상황과 개선 목표를 구체적으로 서술합니다. 이 내용은 최종 보고서에 포함됩니다.</li>
-                <li><strong>목록으로 복귀:</strong> <code>&larr; 목록으로 돌아가기</code> 버튼을 눌러 메인 화면으로 돌아온 후, 다른 모든 지표에 대해 평가를 반복합니다.</li>
-            </ol>
-            
-            <h4>3단계: 결과 확인 및 활용</h4>
-            <ol>
-                <li><strong>종합 결과 확인:</strong> 페이지 하단에서 개선전/후 총 점수와 <strong>'안전관리 수준 증가율(%)'</strong>을 즉시 확인할 수 있습니다.</li>
-                <li><strong>시각화 차트:</strong> 막대그래프를 통해 개선전, 개선후, 총 만점 점수를 직관적으로 비교할 수 있습니다.</li>
-                <li><strong>보고서 생성:</strong> <code>[보고서 생성]</code> 버튼을 누르면 모든 평가 내용이 담긴 전문 보고서가 새 탭으로 열립니다. 인쇄하거나 PDF로 저장할 수 있습니다. (팝업 차단 해제 필요)</li>
-                <li><strong>CSV로 내보내기:</strong> <code>[CSV로 내보내기]</code> 버튼으로 모든 평가 데이터를 엑셀 호환 파일(.csv)로 다운로드하여 별도로 관리하거나 분석할 수 있습니다.</li>
+                <li><div><strong>기본 정보 입력:</strong> 프로그램 상단에 평가자명, 연락처, 지역, 작목반 등 기본 정보를 기입합니다.</div></li>
+                <li><div><strong>평가지표 선택 및 평가:</strong> 메인 화면에서 평가할 지표를 클릭합니다. 상세 페이지에서 '개선전 수준'과 '개선후 수준'을 각각 A~E 등급 중에서 선택하고, '상태 기록'란에 구체적인 내용을 서술합니다.</div></li>
+                <li><div><strong>평가 반복:</strong> <code>&larr; 목록으로 돌아가기</code> 링크를 통해 메인 화면으로 돌아와 모든 지표에 대한 평가를 반복합니다.</div></li>
+                <li><div><strong>결과 확인 및 활용:</strong> 하단의 종합 결과와 시각화 차트로 '안전관리 수준 증가율'을 확인합니다. <code>[보고서 생성]</code>으로 결과를 인쇄하거나 <code>[CSV로 내보내기]</code>로 데이터를 파일로 저장할 수 있습니다.</div></li>
             </ol>
         </div>
     </div>
 
 </body>
 </html>
+
 
 
 
