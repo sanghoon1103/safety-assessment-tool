@@ -179,8 +179,8 @@ function renderApp() {
       <button id="add-row-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">행 추가</button>
       <button id="reset-button" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">초기화</button>
       <button id="print-button" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg">보고서 생성</button>
-      <button type="button" id="csv-import-button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg">CSV 불러오기</button>
-      <input type="file" id="csv-import-input" accept=".csv,text/csv" hidden>
+      <button type="button" id="csv-import-button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg">CSV·엑셀 불러오기</button>
+      <input type="file" id="csv-import-input" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" hidden>
       <button id="csv-export-button" class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg">CSV 저장</button>
     </div>
     <p id="csv-import-status" role="status" class="text-right text-sm text-gray-700 no-print"></p>
@@ -652,6 +652,42 @@ function attachModalEventListeners() {
       return { basicInfo, rows };
     }
 
+
+    async function readEvaluationFile(file, parseCsv) {
+      if (!/\.xlsx?$/i.test(file.name)) return parseCsv(await file.text());
+
+      if (!window.XLSX) {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
+          script.onload = resolve;
+          script.onerror = () => {
+            script.remove();
+            reject(new Error('엑셀 읽기 기능을 불러오지 못했습니다. 인터넷 연결을 확인하거나 CSV 파일을 선택해 주세요.'));
+          };
+          document.head.appendChild(script);
+        });
+      }
+
+      const xlsx = window.XLSX;
+      const workbook = xlsx.read(await file.arrayBuffer());
+      const matches = [];
+      let firstError;
+      for (const name of workbook.SheetNames) {
+        const sheet = workbook.Sheets[name];
+        try {
+          const csv = xlsx.utils.sheet_to_csv(sheet, { rawNumbers: true });
+          matches.push(parseCsv(csv));
+        } catch (error) {
+          firstError ??= error;
+        }
+      }
+      if (matches.length > 1) throw new Error('평가 데이터가 있는 시트가 여러 개입니다. 불러올 시트만 담은 파일을 선택해 주세요.');
+      if (matches.length === 1) return matches[0];
+      if (workbook.SheetNames.length === 1 && firstError) throw firstError;
+      throw new Error('엑셀 파일에서 이 프로그램의 평가 양식에 맞는 시트를 찾지 못했습니다.');
+    }
+
     async function importAssessmentCSV(event) {
       const input = event.currentTarget;
       const file = input.files[0];
@@ -659,7 +695,7 @@ function attachModalEventListeners() {
       if (!file) return;
       let imported;
       try {
-        imported = parseAssessmentCSV(await file.text());
+        imported = await readEvaluationFile(file, parseAssessmentCSV);
         const hasCurrentData = state.rows.some(row => row.task || row.subTask || row.selectedRisks.length) ||
           Object.values(state.basicInfo).some(Boolean);
         if (hasCurrentData && !confirm('현재 화면의 평가와 기본 정보를 불러온 파일 내용으로 교체하시겠습니까?')) return;
