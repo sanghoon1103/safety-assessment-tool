@@ -580,17 +580,27 @@ function attachModalEventListeners() {
     ];
 
     function parseAssessmentCSV(text) {
-      const sections = /^평가 상세 결과\r?\n/m.exec(text);
+      const sections = /^(?:평가 상세 결과|"평가 상세 결과"),*\r?\n/m.exec(text);
       if (!sections) throw new Error('평가 상세 결과를 찾을 수 없습니다.');
-      const [title, ...infoLines] = text.slice(0, sections.index).replace(/^\uFEFF/, '').replace(/(?:\r?\n)+$/, '').split(/\r?\n/);
+      const [title, ...infoLines] = text.slice(0, sections.index)
+        .replace(/^\uFEFF/, '').split(/\r?\n/).filter(line => !/^,*$/.test(line));
       const infoFields = [['평가자명', 'assessor'], ['전화번호', 'phone'], ['지역명', 'region'], ['작목반', 'workGroup']];
-      if (title !== '평가 기본 정보' || infoLines.length !== infoFields.length) {
+      const titleMatch = /^(?:평가 기본 정보|"평가 기본 정보")(,*)$/.exec(title);
+      if (!titleMatch || infoLines.length !== infoFields.length) {
         throw new Error('평가 기본 정보 형식을 확인해 주세요.');
       }
       const basicInfo = Object.fromEntries(infoFields.map(([label, field], index) => {
-        const prefix = label + ',';
-        if (!infoLines[index].startsWith(prefix)) throw new Error('평가 기본 정보 항목이 일치하지 않습니다.');
-        return [field, infoLines[index].slice(prefix.length)];
+        const line = infoLines[index];
+        const prefix = line.startsWith('"' + label + '",') ? '"' + label + '",' : label + ',';
+        if (!line.startsWith(prefix)) throw new Error('평가 기본 정보 항목이 일치하지 않습니다.');
+        let value = line.slice(prefix.length);
+        if (titleMatch[1]) {
+          // 스프레드시트에서 다시 저장하면 기본 정보에도 빈 열이 붙습니다.
+          const padding = titleMatch[1].slice(1);
+          if (value.endsWith(padding)) value = value.slice(0, value.length - padding.length);
+          if (/^"(?:[^"]|"")*"$/.test(value)) value = value.slice(1, -1).replace(/""/g, '"');
+        }
+        return [field, value];
       }));
 
       // 따옴표 안의 쉼표, 줄바꿈 및 이중 따옴표를 보존합니다.
@@ -605,7 +615,7 @@ function attachModalEventListeners() {
         record.push(match[1] === undefined ? match[2] : match[1].replace(/""/g, '"'));
         offset = cell.lastIndex;
         if (match[3] !== ',') {
-          if (record.length > 1 || record[0] !== '') records.push(record);
+          if (record.some(value => value !== '')) records.push(record);
           record = [];
         } else if (offset === text.length) {
           record.push('');
