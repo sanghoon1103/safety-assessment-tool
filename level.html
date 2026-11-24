@@ -366,8 +366,8 @@
 
       container.innerHTML += `
         <div class="mb-4 text-right no-print">
-          <button type="button" id="import-csv-btn" class="px-6 py-3 bg-indigo-600 text-white font-bold rounded-full hover:bg-indigo-700">CSV 불러오기</button>
-          <input type="file" id="import-csv-input" accept=".csv,text/csv" hidden>
+          <button type="button" id="import-csv-btn" class="px-6 py-3 bg-indigo-600 text-white font-bold rounded-full hover:bg-indigo-700">CSV·엑셀 불러오기</button>
+          <input type="file" id="import-csv-input" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" hidden>
           <p id="csv-import-status" role="status" class="mt-2 text-sm text-gray-700"></p>
         </div>
       `;
@@ -992,6 +992,42 @@ ${escapeHtml(afterDescription)}</textarea>
       return { basicInfo, currentGrades, targetGrades, descriptions };
     }
 
+
+    async function readEvaluationFile(file, parseCsv) {
+      if (!/\.xlsx?$/i.test(file.name)) return parseCsv(await file.text());
+
+      if (!window.XLSX) {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
+          script.onload = resolve;
+          script.onerror = () => {
+            script.remove();
+            reject(new Error('엑셀 읽기 기능을 불러오지 못했습니다. 인터넷 연결을 확인하거나 CSV 파일을 선택해 주세요.'));
+          };
+          document.head.appendChild(script);
+        });
+      }
+
+      const xlsx = window.XLSX;
+      const workbook = xlsx.read(await file.arrayBuffer());
+      const matches = [];
+      let firstError;
+      for (const name of workbook.SheetNames) {
+        const sheet = workbook.Sheets[name];
+        try {
+          const csv = xlsx.utils.sheet_to_csv(sheet, { rawNumbers: true });
+          matches.push(parseCsv(csv));
+        } catch (error) {
+          firstError ??= error;
+        }
+      }
+      if (matches.length > 1) throw new Error('평가 데이터가 있는 시트가 여러 개입니다. 불러올 시트만 담은 파일을 선택해 주세요.');
+      if (matches.length === 1) return matches[0];
+      if (workbook.SheetNames.length === 1 && firstError) throw firstError;
+      throw new Error('엑셀 파일에서 이 프로그램의 평가 양식에 맞는 시트를 찾지 못했습니다.');
+    }
+
     async function importLevelCsv(event) {
       const input = event.currentTarget;
       const file = input.files[0];
@@ -1000,7 +1036,7 @@ ${escapeHtml(afterDescription)}</textarea>
 
       let imported;
       try {
-        imported = parseLevelCsv(await file.text());
+        imported = await readEvaluationFile(file, parseLevelCsv);
       } catch (error) {
         alert('파일을 불러오지 못했습니다. ' + error.message);
         return;
