@@ -994,7 +994,20 @@ ${escapeHtml(afterDescription)}</textarea>
 
 
     async function readEvaluationFile(file, parseCsv) {
-      if (!/\.xlsx?$/i.test(file.name)) return parseCsv(await file.text());
+      if (!/\.xlsx?$/i.test(file.name)) {
+        const bytes = await file.arrayBuffer();
+        let csv;
+        try {
+          csv = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+        } catch {
+          try {
+            csv = new TextDecoder('euc-kr', { fatal: true }).decode(bytes);
+          } catch {
+            throw new Error('CSV의 문자 인코딩을 읽을 수 없습니다. UTF-8 또는 한국어 Windows CSV로 저장해 주세요.');
+          }
+        }
+        return parseCsv(csv);
+      }
 
       if (!window.XLSX) {
         await new Promise((resolve, reject) => {
