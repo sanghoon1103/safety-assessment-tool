@@ -179,8 +179,11 @@ function renderApp() {
       <button id="add-row-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">행 추가</button>
       <button id="reset-button" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">초기화</button>
       <button id="print-button" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg">보고서 생성</button>
+      <button type="button" id="csv-import-button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg">CSV 불러오기</button>
+      <input type="file" id="csv-import-input" accept=".csv,text/csv" hidden>
       <button id="csv-export-button" class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg">CSV 저장</button>
     </div>
+    <p id="csv-import-status" role="status" class="text-right text-sm text-gray-700 no-print"></p>
     ${renderBasicInfo()}
     <div class="mb-8">${renderMainTable()}</div>
     <div id="details-table-section" class="mt-8">${renderDetailsTable()}</div>
@@ -196,10 +199,10 @@ function renderApp() {
         <div class="bg-gray-100 p-6 rounded-xl shadow-inner border border-gray-200 mb-8 no-print">
             <h2 class="text-2xl font-bold text-gray-700 mb-4">기본 정보</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div><label class="block text-sm font-bold mb-2">평가자명</label><input type="text" class="basic-info-input w-full p-2 border rounded-lg" data-field="assessor" value="${state.basicInfo.assessor}"></div>
-                <div><label class="block text-sm font-bold mb-2">전화번호</label><input type="text" class="basic-info-input w-full p-2 border rounded-lg" data-field="phone" value="${state.basicInfo.phone}"></div>
-                <div><label class="block text-sm font-bold mb-2">지역명</label><input type="text" class="basic-info-input w-full p-2 border rounded-lg" data-field="region" value="${state.basicInfo.region}"></div>
-                <div><label class="block text-sm font-bold mb-2">작목반</label><input type="text" class="basic-info-input w-full p-2 border rounded-lg" data-field="workGroup" value="${state.basicInfo.workGroup}"></div>
+                <div><label class="block text-sm font-bold mb-2">평가자명</label><input type="text" class="basic-info-input w-full p-2 border rounded-lg" data-field="assessor" value="${escapeHtml(state.basicInfo.assessor)}"></div>
+                <div><label class="block text-sm font-bold mb-2">전화번호</label><input type="text" class="basic-info-input w-full p-2 border rounded-lg" data-field="phone" value="${escapeHtml(state.basicInfo.phone)}"></div>
+                <div><label class="block text-sm font-bold mb-2">지역명</label><input type="text" class="basic-info-input w-full p-2 border rounded-lg" data-field="region" value="${escapeHtml(state.basicInfo.region)}"></div>
+                <div><label class="block text-sm font-bold mb-2">작목반</label><input type="text" class="basic-info-input w-full p-2 border rounded-lg" data-field="workGroup" value="${escapeHtml(state.basicInfo.workGroup)}"></div>
             </div>
         </div>
       `;
@@ -220,10 +223,10 @@ function renderApp() {
           `<button class="edit-manual-button bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-full" data-row-id="${row.id}">수정</button>` :
           `<button class="select-risk-button bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-full ${isRiskSelectable ? '' : 'opacity-50 cursor-not-allowed'}" data-row-id="${row.id}" ${isRiskSelectable ? '' : 'disabled'}>위험 선택</button>`;
         const taskInputOrSelect = row.isManualEntry ?
-          `<span class="w-full block p-2 bg-yellow-50">${row.task || ''}</span>` :
+          `<span class="w-full block p-2 bg-yellow-50">${escapeHtml(row.task || '')}</span>` :
           `<select class="task-select w-full p-2 border rounded-lg" data-row-id="${row.id}"><option value="">작업 선택</option>${tasks.map(t => `<option value="${t}" ${row.task === t ? 'selected' : ''}>${t}</option>`).join('')}<option value="직접 입력">직접 입력</option></select>`;
         const subTaskInputOrSelect = row.isManualEntry ?
-          `<span class="w-full block p-2 bg-yellow-50">${row.subTask || ''}</span>` :
+          `<span class="w-full block p-2 bg-yellow-50">${escapeHtml(row.subTask || '')}</span>` :
           `<select class="subtask-select w-full p-2 border rounded-lg" data-row-id="${row.id}" ${!row.task ? 'disabled' : ''}><option value="">세부작업 선택</option>${subTasks.map(st => `<option value="${st}" ${row.subTask === st ? 'selected' : ''}>${st}</option>`).join('')}</select>`;
         return `<tr class="hover:bg-red-50 group"><td class="p-4 border-b text-center">${row.id}</td><td class="p-4 border-b">${taskInputOrSelect}</td><td class="p-4 border-b">${subTaskInputOrSelect}</td><td class="p-4 border-b text-center">${severityDisplay}</td><td class="p-4 border-b text-center">${frequencyDisplay}</td><td class="p-4 border-b text-center">${weightDisplay}</td><td class="p-4 border-b text-center font-bold text-red-600">${totalScore}</td><td class="p-4 border-b text-center no-print">${riskButton}</td><td class="p-4 border-b text-center no-print"><button class="delete-row-button text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100" data-row-id="${row.id}"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button></td></tr>`;
       }).join('');
@@ -243,7 +246,7 @@ function renderApp() {
         const risk = row.selectedRisks[0];
         const score = (risk.preSeverity * risk.preFrequency) + risk.weight;
         const { level, colorClass } = getRiskLevel(score);
-        return `<tr class="hover:bg-red-50"><td class="py-3 px-4 text-center border-b">${row.id}</td><td class="py-3 px-4 border-b">${row.task}</td><td class="py-3 px-4 border-b">${row.subTask}</td><td class="py-3 px-4 border-b">${row.actualProblem}</td><td class="py-3 px-4 text-center border-b font-bold ${colorClass}">${level}</td><td class="py-3 px-4 text-center border-b font-bold text-red-600">${score}</td></tr>`;
+        return `<tr class="hover:bg-red-50"><td class="py-3 px-4 text-center border-b">${row.id}</td><td class="py-3 px-4 border-b">${escapeHtml(row.task)}</td><td class="py-3 px-4 border-b">${escapeHtml(row.subTask)}</td><td class="py-3 px-4 border-b">${escapeHtml(row.actualProblem)}</td><td class="py-3 px-4 text-center border-b font-bold ${colorClass}">${level}</td><td class="py-3 px-4 text-center border-b font-bold text-red-600">${score}</td></tr>`;
       }).join('');
       return `<div class="bg-gray-100 p-6 rounded-xl"><h2 class="text-2xl font-bold text-red-700 mb-4">2. 개선 전 평가 결과 요약</h2><table class="min-w-full"><thead><tr class="bg-gray-200 text-gray-700 uppercase text-sm"><th class="py-3 px-4 text-center">번호</th><th class="py-3 px-4 text-left">작업</th><th class="py-3 px-4 text-left">세부작업</th><th class="py-3 px-4 text-left" style="width: 40%;">실제 문제점</th><th class="py-3 px-4 text-center">위험등급</th><th class="py-3 px-4 text-center">개선 전 위험도</th></tr></thead><tbody class="text-sm">${tableRows}</tbody></table></div>`;
     }
@@ -262,7 +265,7 @@ function renderApp() {
         const postScore = (postSeverity * postFrequency) + postWeight;
         const reductionRate = preScore > 0 ? (((preScore - postScore) / preScore) * 100).toFixed(2) + '%' : '0.00%';
         const { level: postLevel, colorClass: postColorClass } = getRiskLevel(postScore);
-        return `<tr class="hover:bg-blue-50"><td class="py-3 px-4 text-center border-b">${row.id}</td><td class="py-3 px-4 border-b"><textarea class="post-assessment-input w-full p-1 border rounded" data-row-id="${row.id}" data-field="controls" placeholder="안전 대책">${row.controls || ''}</textarea></td><td class="py-3 px-4 text-center border-b"><input type="number" min="1" max="4" value="${row.postSeverity || ''}" class="post-assessment-input w-16 p-1 text-center border rounded" data-row-id="${row.id}" data-field="postSeverity"></td><td class="py-3 px-4 text-center border-b"><input type="number" min="1" max="5" value="${row.postFrequency || ''}" class="post-assessment-input w-16 p-1 text-center border rounded" data-row-id="${row.id}" data-field="postFrequency"></td><td class="py-3 px-4 text-center border-b"><input type="number" min="0" max="4" value="${row.postWeight === null ? '' : row.postWeight}" class="post-assessment-input w-16 p-1 text-center border rounded" data-row-id="${row.id}" data-field="postWeight"></td><td id="post-score-${row.id}" class="py-3 px-4 text-center border-b font-bold text-blue-600">${postScore}</td><td id="post-level-${row.id}" class="py-3 px-4 text-center border-b font-bold ${postColorClass}">${postLevel}</td><td id="reduction-rate-${row.id}" class="py-3 px-4 text-center border-b font-bold text-green-600">${reductionRate}</td></tr>`;
+        return `<tr class="hover:bg-blue-50"><td class="py-3 px-4 text-center border-b">${row.id}</td><td class="py-3 px-4 border-b"><textarea class="post-assessment-input w-full p-1 border rounded" data-row-id="${row.id}" data-field="controls" placeholder="안전 대책">${escapeHtml(row.controls || '')}</textarea></td><td class="py-3 px-4 text-center border-b"><input type="number" min="1" max="4" value="${row.postSeverity || ''}" class="post-assessment-input w-16 p-1 text-center border rounded" data-row-id="${row.id}" data-field="postSeverity"></td><td class="py-3 px-4 text-center border-b"><input type="number" min="1" max="5" value="${row.postFrequency || ''}" class="post-assessment-input w-16 p-1 text-center border rounded" data-row-id="${row.id}" data-field="postFrequency"></td><td class="py-3 px-4 text-center border-b"><input type="number" min="0" max="4" value="${row.postWeight === null ? '' : row.postWeight}" class="post-assessment-input w-16 p-1 text-center border rounded" data-row-id="${row.id}" data-field="postWeight"></td><td id="post-score-${row.id}" class="py-3 px-4 text-center border-b font-bold text-blue-600">${postScore}</td><td id="post-level-${row.id}" class="py-3 px-4 text-center border-b font-bold ${postColorClass}">${postLevel}</td><td id="reduction-rate-${row.id}" class="py-3 px-4 text-center border-b font-bold text-green-600">${reductionRate}</td></tr>`;
       }).join('');
       return `<div class="bg-gray-100 p-6 rounded-xl"><div class="flex justify-between items-center"><h2 class="text-2xl font-bold text-blue-700 mb-4">3. 개선 후 위험성 평가 및 감소율</h2><button id="update-all-button" class="bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 no-print mb-4">종합 요약에 반영</button></div><table class="min-w-full"><thead><tr class="bg-gray-200 text-gray-700 uppercase text-sm"><th class="py-3 px-4 text-center">번호</th><th class="py-3 px-4 text-left" style="width: 30%;">대책</th><th class="py-3 px-4 text-center">개선 후<br>강도</th><th class="py-3 px-4 text-center">개선 후<br>빈도</th><th class="py-3 px-4 text-center">개선 후<br>가중치</th><th class="py-3 px-4 text-center">개선 후<br>위험도</th><th class="py-3 px-4 text-center">개선 후<br>위험등급</th><th class="py-3 px-4 text-center">위험성<br>감소율</th></tr></thead><tbody class="text-sm">${tableRows}</tbody></table></div>`;
     }
@@ -325,7 +328,7 @@ function renderSummary() {
         const row = state.rows.find(r => r.id === rowId);
         const risksForSubTask = state.assessmentData.find(d => d.task === row.task && d.subTask === row.subTask)?.risks || [];
         state.tempSelectedRisk = null;
-        modalContent.innerHTML = `<div class="flex justify-between items-center mb-4"><h2 class="text-2xl font-bold text-red-700">${row.task} > ${row.subTask}</h2><button id="close-modal-button" class="text-3xl">&times;</button></div><div class="modal-content-scroll pr-4"><div class="grid grid-cols-1 md:grid-cols-2 gap-6"><div><h3 class="font-bold text-lg mb-2">1. 발생 가능한 위험 사례 선택</h3><div class="space-y-2">${risksForSubTask.map(risk => `<div class="case-item p-3 border rounded-lg" data-risk-id="${risk.id}"><p class="font-semibold">${risk.case}</p></div>`).join('')}</div></div><div id="selected-risk-details" class="bg-red-50 p-4 rounded-lg" style="display: none;"></div></div></div><div class="mt-6 flex justify-end"><button id="close-and-save-button" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg">선택 완료</button></div>`;
+        modalContent.innerHTML = `<div class="flex justify-between items-center mb-4"><h2 class="text-2xl font-bold text-red-700">${escapeHtml(row.task)} > ${escapeHtml(row.subTask)}</h2><button id="close-modal-button" class="text-3xl">&times;</button></div><div class="modal-content-scroll pr-4"><div class="grid grid-cols-1 md:grid-cols-2 gap-6"><div><h3 class="font-bold text-lg mb-2">1. 발생 가능한 위험 사례 선택</h3><div class="space-y-2">${risksForSubTask.map(risk => `<div class="case-item p-3 border rounded-lg" data-risk-id="${risk.id}"><p class="font-semibold">${risk.case}</p></div>`).join('')}</div></div><div id="selected-risk-details" class="bg-red-50 p-4 rounded-lg" style="display: none;"></div></div></div><div class="mt-6 flex justify-end"><button id="close-and-save-button" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg">선택 완료</button></div>`;
         modal.style.display = 'flex';
         attachModalEventListeners();
     }
@@ -342,7 +345,7 @@ function renderSummary() {
         const row = state.rows.find(r => r.id === rowId);
         const existingRisk = row.selectedRisks[0] || {};
         const totalScore = (existingRisk.preSeverity || 0) * (existingRisk.preFrequency || 0) + (existingRisk.weight || 0);
-        modalContent.innerHTML = `<div class="flex justify-between items-center mb-4"><h2 class="text-2xl font-bold text-yellow-700">위험 정보 직접 입력 (행: ${rowId})</h2><button id="close-manual-modal-button" class="text-3xl">&times;</button></div><div class="space-y-4"><div><label class="font-bold">작업</label><input type="text" id="manual-task" class="w-full p-2 border rounded" value="${row.task || ''}" placeholder="예: 방제"></div><div><label class="font-bold">세부작업</label><input type="text" id="manual-subtask" class="w-full p-2 border rounded" value="${row.subTask || ''}" placeholder="예: 농약 살포"></div><div><label class="font-bold">실제 문제점</label><textarea id="manual-actual-problem" class="w-full p-2 border rounded" rows="3">${row.actualProblem || ''}</textarea></div><div class="grid grid-cols-3 gap-4"><div><label class="font-bold">강도 (1-4)</label><input type="number" id="manual-severity" min="1" max="4" class="w-full p-2 border rounded" value="${existingRisk.preSeverity || ''}"></div><div><label class="font-bold">빈도 (1-5)</label><input type="number" id="manual-frequency" min="1" max="5" class="w-full p-2 border rounded" value="${existingRisk.preFrequency || ''}"></div><div><label class="font-bold">가중치 (0-4)</label><input type="number" id="manual-weight" min="0" max="4" class="w-full p-2 border rounded" value="${existingRisk.weight || ''}"></div></div><p class="text-lg font-bold text-right"><strong>개선 전 위험도:</strong> <span id="manual-total-score" class="text-red-700">${totalScore}</span></p></div><div class="mt-6 flex justify-end"><button id="save-manual-input-button" class="bg-yellow-500 hover:bg-yellow-600 text-white py-2 px-6 rounded-lg">저장</button></div>`;
+        modalContent.innerHTML = `<div class="flex justify-between items-center mb-4"><h2 class="text-2xl font-bold text-yellow-700">위험 정보 직접 입력 (행: ${rowId})</h2><button id="close-manual-modal-button" class="text-3xl">&times;</button></div><div class="space-y-4"><div><label class="font-bold">작업</label><input type="text" id="manual-task" class="w-full p-2 border rounded" value="${escapeHtml(row.task || '')}" placeholder="예: 방제"></div><div><label class="font-bold">세부작업</label><input type="text" id="manual-subtask" class="w-full p-2 border rounded" value="${escapeHtml(row.subTask || '')}" placeholder="예: 농약 살포"></div><div><label class="font-bold">실제 문제점</label><textarea id="manual-actual-problem" class="w-full p-2 border rounded" rows="3">${escapeHtml(row.actualProblem || '')}</textarea></div><div class="grid grid-cols-3 gap-4"><div><label class="font-bold">강도 (1-4)</label><input type="number" id="manual-severity" min="1" max="4" class="w-full p-2 border rounded" value="${existingRisk.preSeverity ?? ''}"></div><div><label class="font-bold">빈도 (1-5)</label><input type="number" id="manual-frequency" min="1" max="5" class="w-full p-2 border rounded" value="${existingRisk.preFrequency ?? ''}"></div><div><label class="font-bold">가중치 (0-4)</label><input type="number" id="manual-weight" min="0" max="4" class="w-full p-2 border rounded" value="${existingRisk.weight ?? ''}"></div></div><p class="text-lg font-bold text-right"><strong>개선 전 위험도:</strong> <span id="manual-total-score" class="text-red-700">${totalScore}</span></p></div><div class="mt-6 flex justify-end"><button id="save-manual-input-button" class="bg-yellow-500 hover:bg-yellow-600 text-white py-2 px-6 rounded-lg">저장</button></div>`;
         modal.style.display = 'flex';
         attachManualModalEventListeners(rowId);
     }
@@ -364,6 +367,9 @@ function attachEventListeners() {
         }
     }));
     document.getElementById('reset-button').addEventListener('click', resetState);
+    const csvInput = document.getElementById('csv-import-input');
+    document.getElementById('csv-import-button').addEventListener('click', () => csvInput.click());
+    csvInput.addEventListener('change', importAssessmentCSV);
     document.getElementById('csv-export-button').addEventListener('click', exportToCSV);
     document.querySelectorAll('.basic-info-input').forEach(i => i.addEventListener('input', e => {
         state.basicInfo[e.target.dataset.field] = e.target.value;
@@ -433,13 +439,13 @@ function attachEventListeners() {
             <table class="w-full border-collapse border border-gray-400 mb-4 text-base">
                 <tr>
                     <td class="border p-2 font-bold text-center bg-gray-100">작목반</td>
-                    <td class="border p-2">${state.basicInfo.workGroup || ''}</td>
+                    <td class="border p-2">${escapeHtml(state.basicInfo.workGroup || '')}</td>
                     <td class="border p-2 font-bold text-center bg-gray-100">지역명</td>
-                    <td class="border p-2">${state.basicInfo.region || ''}</td>
+                    <td class="border p-2">${escapeHtml(state.basicInfo.region || '')}</td>
                 </tr>
                 <tr>
                     <td class="border p-2 font-bold text-center bg-gray-100">평가자</td>
-                    <td class="border p-2">${state.basicInfo.assessor || ''}</td>
+                    <td class="border p-2">${escapeHtml(state.basicInfo.assessor || '')}</td>
                     <td class="border p-2 font-bold text-center bg-gray-100">평가일</td>
                     <td class="border p-2">${dateString}</td>
                 </tr>
@@ -562,6 +568,102 @@ function attachModalEventListeners() {
         }));
     }
     
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, char => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      })[char]);
+    }
+
+    const csvHeaders = [
+        "번호", "작업", "세부작업", "실제 문제점", "개선 전 강도", "개선 전 빈도", "개선 전 가중치", "개선 전 위험도", "개선 전 위험등급", "대책", "개선 후 강도", "개선 후 빈도", "개선 후 가중치", "개선 후 위험도", "개선 후 위험등급", "위험성 감소율(%)"
+    ];
+
+    function parseAssessmentCSV(text) {
+      const sections = /^평가 상세 결과\r?\n/m.exec(text);
+      if (!sections) throw new Error('평가 상세 결과를 찾을 수 없습니다.');
+      const [title, ...infoLines] = text.slice(0, sections.index).replace(/^\uFEFF/, '').replace(/(?:\r?\n)+$/, '').split(/\r?\n/);
+      const infoFields = [['평가자명', 'assessor'], ['전화번호', 'phone'], ['지역명', 'region'], ['작목반', 'workGroup']];
+      if (title !== '평가 기본 정보' || infoLines.length !== infoFields.length) {
+        throw new Error('평가 기본 정보 형식을 확인해 주세요.');
+      }
+      const basicInfo = Object.fromEntries(infoFields.map(([label, field], index) => {
+        const prefix = label + ',';
+        if (!infoLines[index].startsWith(prefix)) throw new Error('평가 기본 정보 항목이 일치하지 않습니다.');
+        return [field, infoLines[index].slice(prefix.length)];
+      }));
+
+      // 따옴표 안의 쉼표, 줄바꿈 및 이중 따옴표를 보존합니다.
+      const cell = /(?:"((?:[^"]|"")*)"|([^",\r\n]*))(,|\r\n|\n|$)/y;
+      const records = [];
+      let record = [];
+      let offset = sections.index + sections[0].length;
+      while (offset < text.length) {
+        cell.lastIndex = offset;
+        const match = cell.exec(text);
+        if (!match) throw new Error('CSV 셀의 따옴표나 구분자가 올바르지 않습니다.');
+        record.push(match[1] === undefined ? match[2] : match[1].replace(/""/g, '"'));
+        offset = cell.lastIndex;
+        if (match[3] !== ',') {
+          if (record.length > 1 || record[0] !== '') records.push(record);
+          record = [];
+        } else if (offset === text.length) {
+          record.push('');
+          records.push(record);
+        }
+      }
+
+      const header = records.shift();
+      if (!header || header.length !== csvHeaders.length || !csvHeaders.every((name, index) => header[index] === name)) {
+        throw new Error('이 프로그램에서 저장한 위험성평가 CSV를 선택해 주세요.');
+      }
+      if (!records.length) throw new Error('불러올 평가 항목이 없습니다.');
+
+      const ids = new Set();
+      const rows = records.map((record, index) => {
+        const [number, task, subTask, actualProblem, severity, frequency, weight, , , controls, postSeverity, postFrequency, postWeight] = record;
+        const id = Number(number);
+        const scores = [severity, frequency, weight, postSeverity, postFrequency, postWeight];
+        if (record.length !== csvHeaders.length || !Number.isSafeInteger(id) || id < 1 || ids.has(id) ||
+            !task || !subTask || scores.some(score => !/^-?\d+$/.test(score) || !Number.isSafeInteger(Number(score)))) {
+          throw new Error('평가 상세 결과 ' + (index + 1) + '번째 항목의 형식이 올바르지 않습니다.');
+        }
+        ids.add(id);
+        return {
+          ...createNewRow(id), task, subTask, actualProblem, controls,
+          // 기존 CSV에는 위험 사례 ID와 입력 방식이 기록되지 않습니다.
+          isManualEntry: true,
+          selectedRisks: [{ id: 'manual_' + id, preSeverity: Number(severity), preFrequency: Number(frequency), weight: Number(weight) }],
+          postSeverity: Number(postSeverity) || null,
+          postFrequency: Number(postFrequency) || null,
+          postWeight: Number(postWeight)
+        };
+      });
+      return { basicInfo, rows };
+    }
+
+    async function importAssessmentCSV(event) {
+      const input = event.currentTarget;
+      const file = input.files[0];
+      input.value = '';
+      if (!file) return;
+      let imported;
+      try {
+        imported = parseAssessmentCSV(await file.text());
+        const hasCurrentData = state.rows.some(row => row.task || row.subTask || row.selectedRisks.length) ||
+          Object.values(state.basicInfo).some(Boolean);
+        if (hasCurrentData && !confirm('현재 화면의 평가와 기본 정보를 불러온 파일 내용으로 교체하시겠습니까?')) return;
+        localStorage.setItem('riskAssessmentState', JSON.stringify(imported));
+      } catch (error) {
+        alert('파일을 불러오지 못했습니다. ' + error.message);
+        return;
+      }
+      state.basicInfo = imported.basicInfo;
+      state.rows = imported.rows;
+      renderApp();
+      document.getElementById('csv-import-status').textContent = imported.rows.length + '개 평가 항목을 불러왔습니다. 각 행의 수정 버튼으로 편집할 수 있습니다.';
+    }
+
    function exportToCSV() {
     const assessedRows = state.rows.filter(row => row.task && row.subTask && row.selectedRisks.length > 0);
     if (assessedRows.length === 0) return alert("내보낼 데이터가 없습니다.");
@@ -583,10 +685,7 @@ function attachModalEventListeners() {
 
     // --- 2. 평가 데이터 표 생성 (기본 정보 제외) ---
     csvContent += "평가 상세 결과\r\n";
-    const headers = [
-        "번호", "작업", "세부작업", "실제 문제점", "개선 전 강도", "개선 전 빈도", "개선 전 가중치", "개선 전 위험도", "개선 전 위험등급", "대책", "개선 후 강도", "개선 후 빈도", "개선 후 가중치", "개선 후 위험도", "개선 후 위험등급", "위험성 감소율(%)"
-    ];
-    csvContent += headers.join(',') + '\r\n';
+    csvContent += csvHeaders.join(',') + '\r\n';
 
     assessedRows.forEach(row => {
         const preRisk = row.selectedRisks[0];
